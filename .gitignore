@@ -23,3 +23,16 @@ __pycache__/
 # Build output
 dist/
 build/
+
+# Next.js
+.next/
+out/
+next-env.d.ts
+*.tsbuildinfo
+
+# Local test Postgres (scripts/test-db.sh)
+.pgdata/
+
+# Supabase local
+supabase/.branches/
+supabase/.temp/
