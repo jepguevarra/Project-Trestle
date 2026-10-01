@@ -89,9 +89,14 @@ tests/
 
 ## Request paths
 
-**Authenticated app.** Browser → Server Component / Server Action → Supabase client carrying the
-user's JWT → RLS enforces isolation. The app never sets `org_id` from a request body; it resolves
-the org from the URL slug and verifies membership in `lib/auth`.
+**Authenticated app.** Browser → Server Component / Server Action → `lib/auth` verifies the session
+with Supabase Auth → `withRls` (`lib/db`) opens a transaction as Postgres's `authenticated` role
+with the user's JWT claims → query or mutation from `lib/db/queries` / `lib/db/mutations` → RLS
+enforces isolation. Drizzle connects as the database owner, which bypasses RLS, so tenant queries
+must go through `withRls`; the Supabase JS client is used for Auth only. The app never sets
+`org_id` from a request body; it resolves the org from the URL slug and verifies membership in
+`lib/auth`. Org-scoped Server Actions go through `orgAction` (`lib/auth/action.ts`), which
+validates with Zod, then checks membership and role, then runs the handler inside `withRls`.
 
 **Anonymous respondent.** Browser → `app/api/public/survey/[token]` → verify signed token →
 service-role Supabase client → write scoped strictly to that respondent's row. RLS is bypassed
@@ -131,7 +136,7 @@ not the first request.
 - **Integration (Vitest + a test Postgres):** RLS. For each tenant-scoped table there is a test
   that user A cannot select, insert, update, or delete a row belonging to org B. This suite is
   the one that must never be skipped.
-- **E2E (Playwright):** three flows — sign up and create an org; run an assessment end to end
+- **E2E (Playwright, `tests/e2e/`):** run against a real app and Supabase stack. Three flows — sign up and create an org; run an assessment end to end
   (create instrument → invite → answer as anonymous respondent → see the score); author and
   export an SOP.
 

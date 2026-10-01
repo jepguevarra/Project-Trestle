@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { echoValues } from "@/lib/auth/action-state";
 import { assignableRoles, hasRole } from "@/lib/auth/roles";
 import { hashInvitationToken, generateInvitationToken } from "@/lib/tokens/invitation";
 import { inviteMemberSchema, safeNextPath, signUpSchema } from "@/lib/validation/auth";
@@ -54,5 +55,19 @@ describe("validation", () => {
   it("normalises invited emails and rejects unknown roles", () => {
     expect(inviteMemberSchema.parse({ email: " Bob@Example.COM ", role: "viewer" }).email).toBe("bob@example.com");
     expect(inviteMemberSchema.safeParse({ email: "bob@example.com", role: "superuser" }).success).toBe(false);
+  });
+});
+
+describe("echoValues", () => {
+  it("returns submitted text fields but never secrets or React internals", () => {
+    const fd = new FormData();
+    fd.set("email", "a@b.co");
+    fd.set("orgName", "Acme");
+    fd.set("password", "hunter22");
+    fd.set("confirm", "hunter22");
+    fd.set("invite", "x");
+    fd.set("token", "secret-token");
+    fd.set("$ACTION_ID_abc", "");
+    expect(echoValues(fd)).toEqual({ email: "a@b.co", orgName: "Acme", invite: "x" });
   });
 });

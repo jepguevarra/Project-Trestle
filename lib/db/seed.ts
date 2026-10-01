@@ -1,15 +1,17 @@
 import { createClient } from "@supabase/supabase-js";
 import { config } from "dotenv";
-import { and, eq, sql } from "drizzle-orm";
+import { and, eq, isNull, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
-import { membership, organization } from "./schema";
+import { generateInvitationToken, hashInvitationToken, INVITATION_TTL_MS } from "../tokens/invitation";
+import { invitation, membership, organization } from "./schema";
 import * as schema from "./schema";
 
 config({ path: [".env.local", ".env"], quiet: true });
 
 /**
- * `pnpm db:seed` — two orgs and three users, so a fresh clone is usable in one command.
+ * `pnpm db:seed` — two orgs, three users and a pending invitation, so a fresh clone is usable in
+ * one command.
  *
  * Users are created through Supabase Auth's normal sign-up (anon key), so the real sign-up trigger
  * creates each owner's org. Cross-org memberships are then added with the owner connection. Safe
@@ -72,11 +74,29 @@ async function main() {
     if (!m) await db.insert(membership).values({ orgId, userId, role });
   }
 
+  // A pending invitation, so the members page and the accept flow have something to show. The
+  // token is stored only as a hash, so a re-run replaces the invitation and prints a fresh link.
+  const inviteeEmail = "dave@newhire.test";
+  const token = generateInvitationToken();
+  await db
+    .delete(invitation)
+    .where(and(eq(invitation.orgId, acme.id), eq(invitation.email, inviteeEmail), isNull(invitation.acceptedAt)));
+  await db.insert(invitation).values({
+    orgId: acme.id,
+    email: inviteeEmail,
+    role: "consultant",
+    tokenHash: hashInvitationToken(token),
+    expiresAt: new Date(Date.now() + INVITATION_TTL_MS),
+    invitedBy: ids["alice@acme.test"]!,
+  });
+
   await client.end();
   console.log(`Seeded. Sign in with any of these, password "${PASSWORD}":`);
   console.log(`  alice@acme.test       owner of ${acme.name} (/${acme.slug})`);
   console.log(`  bob@beacon.test       owner of ${beacon.name} (/${beacon.slug})`);
   console.log(`  carol@freelance.test  consultant at ${acme.name}, viewer at ${beacon.name}`);
+  const appUrl = process.env.APP_URL ?? "http://localhost:3000";
+  console.log(`Pending invitation for ${inviteeEmail} (consultant at ${acme.name}): ${appUrl}/invite/${token}`);
 }
 
 main().catch((err: unknown) => {

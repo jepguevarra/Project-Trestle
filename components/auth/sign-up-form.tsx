@@ -19,6 +19,7 @@ export function SignUpForm({ invite, email }: { invite?: string; email?: string 
           label="Firm name"
           name="orgName"
           autoComplete="organization"
+          defaultValue={state.values?.orgName}
           required
           errors={state.fieldErrors?.orgName}
         />
@@ -28,7 +29,7 @@ export function SignUpForm({ invite, email }: { invite?: string; email?: string 
         name="email"
         type="email"
         autoComplete="email"
-        defaultValue={email}
+        defaultValue={state.values?.email ?? email}
         required
         errors={state.fieldErrors?.email}
       />

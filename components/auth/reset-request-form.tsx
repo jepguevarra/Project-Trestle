@@ -11,7 +11,15 @@ export function ResetRequestForm() {
   const [state, action, pending] = useActionState(requestPasswordReset, idle);
   return (
     <form action={action} className="grid gap-4">
-      <FormField label="Email" name="email" type="email" autoComplete="email" required errors={state.fieldErrors?.email} />
+      <FormField
+        label="Email"
+        name="email"
+        type="email"
+        autoComplete="email"
+        defaultValue={state.values?.email}
+        required
+        errors={state.fieldErrors?.email}
+      />
       <FormMessage state={state} />
       <Button type="submit" disabled={pending}>
         {pending ? "Sending…" : "Send reset link"}

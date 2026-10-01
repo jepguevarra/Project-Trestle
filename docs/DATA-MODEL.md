@@ -414,6 +414,22 @@ create policy tenant_isolation on <table>
   with check (org_id in (select org_id from membership where user_id = auth.uid()));
 ```
 
+**As built (phase 01).** Written literally, this policy fails on `membership` itself: a policy that
+selects from the table it protects recurses ("infinite recursion detected in policy"). The
+membership lookup therefore lives in a `SECURITY DEFINER` helper, and policies read
+`org_id in (select private.user_org_ids())`, which is the same predicate. And because Supabase
+exposes `public` through its Data API, the tenancy tables also check role on writes:
+
+| Table | Read | Write |
+|---|---|---|
+| `organization` | members | update: admin+; delete: owner; insert: none (created by `create_org_with_owner`) |
+| `membership` | members | admin+, and only owners may grant, change or remove an owner |
+| `invitation` | admin+ | admin+, and only owners may invite an owner |
+
+A trigger keeps at least one owner per org. Sign-up creates the org and owner membership in a
+trigger on `auth.users`; invitations are accepted through `public.accept_invitation(token)`. See
+`drizzle/0000_foundations.sql` and the build notes in `plan/phase-01-foundations.md`.
+
 Engagement-level scoping for `consultant` and `viewer` roles layers **on top of**, never instead of,
 the org predicate:
 

@@ -1,10 +1,16 @@
 "use server";
 
-import { and, eq, isNull, sql } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { orgAction } from "@/lib/auth/action";
 import { assignableRoles } from "@/lib/auth/roles";
-import { invitation, membership } from "@/lib/db/schema";
+import {
+  createInvitation,
+  deleteInvitation,
+  deleteMembership,
+  deletePendingInvitation,
+  updateMembershipRole,
+} from "@/lib/db/mutations/members";
+import { findMembershipRole, findUnacceptedInvitation, isOrgMemberEmail } from "@/lib/db/queries/members";
 import { sendEmail } from "@/lib/email";
 import { invitationEmail } from "@/lib/email/invitation";
 import { env } from "@/lib/env";
@@ -18,31 +24,24 @@ import {
 
 const membersPath = (slug: string) => `/${slug}/settings/members`;
 const forbiddenRole = { ok: false, message: "You can't assign that role." } as const;
+const memberGone = { ok: false, message: "That member no longer exists." } as const;
 
 export const inviteMember = orgAction("admin", inviteMemberSchema, async ({ tx, org, role, user }, input) => {
   if (!assignableRoles(role).includes(input.role)) return forbiddenRole;
-
-  const existing = await tx.execute<{ email: string }>(
-    sql`select email from public.org_members(${org.id}) where lower(email) = ${input.email}`,
-  );
-  if (existing.length > 0) return { ok: false, message: `${input.email} is already a member.` };
+  if (await isOrgMemberEmail(tx, org.id, input.email)) {
+    return { ok: false, message: `${input.email} is already a member.` };
+  }
 
   // Checked up front rather than by catching the unique violation: a failed statement aborts the
   // whole transaction. An expired, unaccepted invitation is cleared so the address can be re-invited.
-  const pendingForEmail = and(
-    eq(invitation.orgId, org.id),
-    sql`lower(${invitation.email}) = ${input.email}`,
-    isNull(invitation.acceptedAt),
-  );
-  const [pending] = await tx.select({ expiresAt: invitation.expiresAt }).from(invitation).where(pendingForEmail);
-  if (pending && pending.expiresAt > new Date()) {
+  const existing = await findUnacceptedInvitation(tx, org.id, input.email);
+  if (existing && existing.expiresAt > new Date()) {
     return { ok: false, message: `${input.email} already has a pending invitation.` };
   }
-  if (pending) await tx.delete(invitation).where(pendingForEmail);
+  if (existing) await deleteInvitation(tx, org.id, existing.id);
 
   const token = generateInvitationToken();
-  await tx.insert(invitation).values({
-    orgId: org.id,
+  await createInvitation(tx, org.id, {
     email: input.email,
     role: input.role,
     tokenHash: hashInvitationToken(token),
@@ -65,40 +64,28 @@ export const inviteMember = orgAction("admin", inviteMemberSchema, async ({ tx, 
 });
 
 export const changeRole = orgAction("admin", changeRoleSchema, async ({ tx, org, role }, input) => {
-  const [target] = await tx
-    .select({ role: membership.role })
-    .from(membership)
-    .where(and(eq(membership.id, input.membershipId), eq(membership.orgId, org.id)));
-  if (!target) return { ok: false, message: "That member no longer exists." };
-
+  const current = await findMembershipRole(tx, org.id, input.membershipId);
+  if (!current) return memberGone;
   const allowed = assignableRoles(role);
-  if (!allowed.includes(target.role) || !allowed.includes(input.role)) return forbiddenRole;
+  if (!allowed.includes(current) || !allowed.includes(input.role)) return forbiddenRole;
 
-  await tx
-    .update(membership)
-    .set({ role: input.role })
-    .where(and(eq(membership.id, input.membershipId), eq(membership.orgId, org.id)));
+  await updateMembershipRole(tx, org.id, input.membershipId, input.role);
   revalidatePath(membersPath(org.slug));
   return { ok: true, message: "Role updated." };
 });
 
 export const removeMember = orgAction("admin", removeMemberSchema, async ({ tx, org, role }, input) => {
-  const [target] = await tx
-    .select({ role: membership.role })
-    .from(membership)
-    .where(and(eq(membership.id, input.membershipId), eq(membership.orgId, org.id)));
-  if (!target) return { ok: false, message: "That member no longer exists." };
-  if (!assignableRoles(role).includes(target.role)) return forbiddenRole;
+  const current = await findMembershipRole(tx, org.id, input.membershipId);
+  if (!current) return memberGone;
+  if (!assignableRoles(role).includes(current)) return forbiddenRole;
 
-  await tx.delete(membership).where(and(eq(membership.id, input.membershipId), eq(membership.orgId, org.id)));
+  await deleteMembership(tx, org.id, input.membershipId);
   revalidatePath(membersPath(org.slug));
   return { ok: true, message: "Member removed." };
 });
 
 export const revokeInvitation = orgAction("admin", revokeInvitationSchema, async ({ tx, org }, input) => {
-  await tx
-    .delete(invitation)
-    .where(and(eq(invitation.id, input.invitationId), eq(invitation.orgId, org.id), isNull(invitation.acceptedAt)));
+  await deletePendingInvitation(tx, org.id, input.invitationId);
   revalidatePath(membersPath(org.slug));
   return { ok: true, message: "Invitation revoked." };
 });

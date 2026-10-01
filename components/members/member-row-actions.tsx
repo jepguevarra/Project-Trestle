@@ -50,7 +50,7 @@ export function MemberRowActions({
           }}
         >
           <input type="hidden" name="membershipId" value={membershipId} />
-          <Button type="submit" variant="ghost" size="sm" className="text-destructive" disabled={removing}>
+          <Button type="submit" variant="ghost" size="sm" className="text-muted-foreground hover:text-destructive" disabled={removing}>
             Remove
           </Button>
         </form>

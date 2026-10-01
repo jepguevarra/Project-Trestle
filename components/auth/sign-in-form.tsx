@@ -13,7 +13,15 @@ export function SignInForm({ next }: { next?: string }) {
   return (
     <form action={action} className="grid gap-4">
       {next ? <input type="hidden" name="next" value={next} /> : null}
-      <FormField label="Email" name="email" type="email" autoComplete="email" required errors={state.fieldErrors?.email} />
+      <FormField
+        label="Email"
+        name="email"
+        type="email"
+        autoComplete="email"
+        defaultValue={state.values?.email}
+        required
+        errors={state.fieldErrors?.email}
+      />
       <FormField
         label="Password"
         name="password"

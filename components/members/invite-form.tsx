@@ -19,10 +19,17 @@ export function InviteForm({
   const [state, formAction, pending] = useActionState(action, idle);
   return (
     <form action={formAction} className="grid gap-3 sm:grid-cols-[1fr_auto_auto] sm:items-end">
-      <FormField label="Email" name="email" type="email" required errors={state.fieldErrors?.email} />
+      <FormField
+        label="Email"
+        name="email"
+        type="email"
+        defaultValue={state.values?.email}
+        required
+        errors={state.fieldErrors?.email}
+      />
       <div className="grid gap-1.5">
         <Label htmlFor="invite-role">Role</Label>
-        <Select id="invite-role" name="role" defaultValue="consultant">
+        <Select id="invite-role" name="role" defaultValue={state.values?.role ?? "consultant"}>
           {roles.map((r) => (
             <option key={r} value={r}>
               {ROLE_LABELS[r]}

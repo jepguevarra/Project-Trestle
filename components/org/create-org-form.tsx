@@ -10,7 +10,14 @@ export function CreateOrgForm() {
   const [state, action, pending] = useActionState(createOrganization, idle);
   return (
     <form action={action} className="grid gap-4">
-      <FormField label="Firm name" name="name" autoComplete="organization" required errors={state.fieldErrors?.name} />
+      <FormField
+        label="Firm name"
+        name="name"
+        autoComplete="organization"
+        defaultValue={state.values?.name}
+        required
+        errors={state.fieldErrors?.name}
+      />
       <Button type="submit" disabled={pending}>
         {pending ? "Creating…" : "Create workspace"}
       </Button>

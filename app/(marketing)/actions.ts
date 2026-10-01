@@ -1,7 +1,7 @@
 "use server";
 
 import { redirect } from "next/navigation";
-import { fieldErrorsFrom, type ActionState } from "@/lib/auth/action-state";
+import { echoValues, fieldErrorsFrom, type ActionState } from "@/lib/auth/action-state";
 import { env } from "@/lib/env";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import {
@@ -12,15 +12,16 @@ import {
   updatePasswordSchema,
 } from "@/lib/validation/auth";
 
-const invalid = (issues: Parameters<typeof fieldErrorsFrom>[0]): ActionState => ({
+const invalid = (issues: Parameters<typeof fieldErrorsFrom>[0], formData: FormData): ActionState => ({
   ok: false,
   message: "Check the highlighted fields.",
   fieldErrors: fieldErrorsFrom(issues),
+  values: echoValues(formData),
 });
 
 export async function signUp(_prev: ActionState, formData: FormData): Promise<ActionState> {
   const parsed = signUpSchema.safeParse(Object.fromEntries(formData));
-  if (!parsed.success) return invalid(parsed.error.issues);
+  if (!parsed.success) return invalid(parsed.error.issues, formData);
   const { email, password, orgName, invite } = parsed.data;
 
   const next = invite ? `/invite/${encodeURIComponent(invite)}` : "/";
@@ -35,7 +36,7 @@ export async function signUp(_prev: ActionState, formData: FormData): Promise<Ac
       emailRedirectTo: `${env.APP_URL}/auth/callback?next=${encodeURIComponent(next)}`,
     },
   });
-  if (error) return { ok: false, message: error.message };
+  if (error) return { ok: false, message: error.message, values: echoValues(formData) };
 
   // With email confirmation off (the local default) the user is signed in straight away.
   if (data.session) redirect(next as never);
@@ -44,14 +45,14 @@ export async function signUp(_prev: ActionState, formData: FormData): Promise<Ac
 
 export async function signIn(_prev: ActionState, formData: FormData): Promise<ActionState> {
   const parsed = signInSchema.safeParse(Object.fromEntries(formData));
-  if (!parsed.success) return invalid(parsed.error.issues);
+  if (!parsed.success) return invalid(parsed.error.issues, formData);
 
   const supabase = await createSupabaseServerClient();
   const { error } = await supabase.auth.signInWithPassword({
     email: parsed.data.email,
     password: parsed.data.password,
   });
-  if (error) return { ok: false, message: "Email or password is incorrect." };
+  if (error) return { ok: false, message: "Email or password is incorrect.", values: echoValues(formData) };
   redirect(safeNextPath(parsed.data.next) as never);
 }
 
@@ -63,7 +64,7 @@ export async function signOut(): Promise<void> {
 
 export async function requestPasswordReset(_prev: ActionState, formData: FormData): Promise<ActionState> {
   const parsed = resetRequestSchema.safeParse(Object.fromEntries(formData));
-  if (!parsed.success) return invalid(parsed.error.issues);
+  if (!parsed.success) return invalid(parsed.error.issues, formData);
 
   const supabase = await createSupabaseServerClient();
   await supabase.auth.resetPasswordForEmail(parsed.data.email, {
@@ -75,7 +76,7 @@ export async function requestPasswordReset(_prev: ActionState, formData: FormDat
 
 export async function updatePassword(_prev: ActionState, formData: FormData): Promise<ActionState> {
   const parsed = updatePasswordSchema.safeParse(Object.fromEntries(formData));
-  if (!parsed.success) return invalid(parsed.error.issues);
+  if (!parsed.success) return invalid(parsed.error.issues, formData);
 
   const supabase = await createSupabaseServerClient();
   const { error } = await supabase.auth.updateUser({ password: parsed.data.password });

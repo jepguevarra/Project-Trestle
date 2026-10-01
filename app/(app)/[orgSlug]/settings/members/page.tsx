@@ -1,18 +1,15 @@
-import { and, asc, eq, gt, isNull, sql } from "drizzle-orm";
 import type { Metadata } from "next";
 import { InviteForm } from "@/components/members/invite-form";
 import { MemberRowActions } from "@/components/members/member-row-actions";
 import { RevokeInvitationButton } from "@/components/members/revoke-invitation-button";
 import { requireMembership } from "@/lib/auth/membership";
-import { assignableRoles, hasRole, ROLE_LABELS, type Role } from "@/lib/auth/roles";
+import { assignableRoles, hasRole, ROLE_LABELS } from "@/lib/auth/roles";
 import { claimsFor } from "@/lib/auth/session";
 import { withRls } from "@/lib/db";
-import { invitation } from "@/lib/db/schema";
+import { listOrgMembers, listPendingInvitations } from "@/lib/db/queries/members";
 import { changeRole, inviteMember, removeMember, revokeInvitation } from "./actions";
 
 export const metadata: Metadata = { title: "Members" };
-
-type MemberRow = { membership_id: string; user_id: string; email: string; role: Role; created_at: string };
 
 export default async function MembersPage({ params }: { params: Promise<{ orgSlug: string }> }) {
   const { orgSlug } = await params;
@@ -21,15 +18,9 @@ export default async function MembersPage({ params }: { params: Promise<{ orgSlu
   const roles = assignableRoles(role);
 
   const { members, pending } = await withRls(claimsFor(user), async (tx) => ({
-    members: await tx.execute<MemberRow>(sql`select * from public.org_members(${org.id})`),
+    members: await listOrgMembers(tx, org.id),
     // RLS returns no invitations to non-admins; the query is skipped for them anyway.
-    pending: canManage
-      ? await tx
-          .select({ id: invitation.id, email: invitation.email, role: invitation.role, expiresAt: invitation.expiresAt })
-          .from(invitation)
-          .where(and(eq(invitation.orgId, org.id), isNull(invitation.acceptedAt), gt(invitation.expiresAt, new Date())))
-          .orderBy(asc(invitation.email))
-      : [],
+    pending: canManage ? await listPendingInvitations(tx, org.id) : [],
   }));
 
   return (
@@ -54,19 +45,19 @@ export default async function MembersPage({ params }: { params: Promise<{ orgSlu
         </h2>
         <ul className="divide-y divide-border rounded-md border border-border bg-card">
           {members.map((m) => {
-            const manageable = m.user_id !== user.id && roles.includes(m.role);
+            const manageable = m.userId !== user.id && roles.includes(m.role);
             return (
-              <li key={m.membership_id} className="flex flex-wrap items-center justify-between gap-3 px-4 py-3">
+              <li key={m.membershipId} className="flex flex-wrap items-center justify-between gap-3 px-4 py-3">
                 <div className="min-w-0">
-                  <p className="truncate text-sm font-medium">
+                  <p className="truncate text-sm">
                     {m.email}
-                    {m.user_id === user.id ? <span className="text-muted-foreground"> (you)</span> : null}
+                    {m.userId === user.id ? <span className="text-muted-foreground"> (you)</span> : null}
                   </p>
-                  <p className="text-xs text-muted-foreground">{ROLE_LABELS[m.role]}</p>
+                  <p className="text-sm text-muted-foreground">{ROLE_LABELS[m.role]}</p>
                 </div>
                 {manageable ? (
                   <MemberRowActions
-                    membershipId={m.membership_id}
+                    membershipId={m.membershipId}
                     email={m.email}
                     role={m.role}
                     roles={roles}
@@ -90,7 +81,7 @@ export default async function MembersPage({ params }: { params: Promise<{ orgSlu
               <li key={i.id} className="flex flex-wrap items-center justify-between gap-3 px-4 py-3">
                 <div className="min-w-0">
                   <p className="truncate text-sm">{i.email}</p>
-                  <p className="text-xs text-muted-foreground">
+                  <p className="text-sm text-muted-foreground">
                     {ROLE_LABELS[i.role]} · expires {i.expiresAt.toISOString().slice(0, 10)}
                   </p>
                 </div>

@@ -12,11 +12,13 @@
     "start": "next start",
     "lint": "eslint . --max-warnings=0",
     "typecheck": "tsc --noEmit",
-    "test": "pnpm test:unit && pnpm test:rls",
+    "test": "vitest run",
     "test:unit": "vitest run --project unit",
     "test:rls": "vitest run --project rls",
+    "test:e2e": "playwright test",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "tsx lib/db/migrate.ts",
+    "db:studio": "drizzle-kit studio",
     "db:seed": "tsx lib/db/seed.ts",
     "db:test:start": "bash scripts/test-db.sh start",
     "db:test:stop": "bash scripts/test-db.sh stop"
@@ -38,6 +40,7 @@
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3.3.7",
+    "@playwright/test": "~1.63.0",
     "@tailwindcss/postcss": "^4.3.3",
     "@types/node": "^22.20.4",
     "@types/react": "^19.3.0",

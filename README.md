@@ -32,10 +32,10 @@ emails are printed to the dev server's log.
 
 ```bash
 pnpm lint && pnpm typecheck && pnpm build
-pnpm test:unit
 pnpm db:test:start                   # or point TEST_DATABASE_URL at supabase's :54322
 export TEST_DATABASE_URL=postgresql://postgres@127.0.0.1:54329/postgres
-pnpm test:rls
+pnpm test                            # unit + RLS isolation (Vitest)
+pnpm test:e2e                        # Playwright; needs `supabase start` and `pnpm db:migrate`
 ```
 
 The RLS suite creates and drops its own database. It never skips: without `TEST_DATABASE_URL` it
@@ -48,5 +48,4 @@ fails.
 
 ## Working in this repo
 
-Read [`CLAUDE.md`](CLAUDE.md) first. It holds the rules that are easy to break and the definition of
-done for every phase.
+Read [`CLAUDE.md`](CLAUDE.md) first: it is the working agreement for this repo.

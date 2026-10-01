@@ -48,42 +48,52 @@ Clients, engagements, billing, anything with `engagement_id` on it. Org settings
 
 Where the build departed from the plan or the docs, and why. Per `README.md` step 2.
 
-1. **Drizzle bypasses RLS unless told otherwise.** `ARCHITECTURE.md` routes app queries through "a
-   Supabase client carrying the user's JWT", but Drizzle connects as the database owner, which
-   ignores every policy. All tenant queries therefore run inside `withRls` (`lib/db/rls.ts`), which
-   sets `request.jwt.claims` and `SET LOCAL ROLE authenticated` per transaction. The RLS suite calls
-   the same function, so the tests exercise the app's real path.
-2. **The canonical policy recurses on `membership`.** A policy on `membership` that selects from
-   `membership` fails with "infinite recursion detected in policy". Policies use a
-   `SECURITY DEFINER` helper, `private.user_org_ids()`, instead. The predicate is the same, and so is
-   the index it uses.
-3. **Write policies check role on these three tables**, not only org membership. Supabase exposes
-   `public` through its Data API, so with a plain `for all` org predicate a viewer could promote
-   themselves to owner. Rule: members read; admins manage; only owners touch owners. An org also
-   always keeps at least one owner, enforced by a trigger.
+1. **Drizzle bypasses RLS unless told otherwise.** Drizzle connects as the database owner, which
+   ignores every policy. All tenant queries run inside `withRls` (`lib/db/rls.ts`), which sets
+   `request.jwt.claims` and `SET LOCAL ROLE authenticated` per transaction. The RLS suite calls the
+   same function, so the tests exercise the app's real path. `ARCHITECTURE.md` updated.
+2. **The canonical policy recurses on `membership`.** Policies use a `SECURITY DEFINER` helper,
+   `private.user_org_ids()`, with the same predicate. `DATA-MODEL.md` §12 updated.
+3. **Write policies check role on the three tenancy tables**, because Supabase's Data API exposes
+   them: with a plain org predicate a viewer could promote themselves to owner. Members read; admins
+   manage; only owners touch owners; an org always keeps one owner (trigger).
 4. **Org creation and invitation acceptance are `SECURITY DEFINER` functions.** A new user has no
    membership to satisfy RLS with, and an invitee cannot see the invitation. Sign-up creates the
-   org and the owner membership in a trigger on `auth.users`, in the same transaction as the user.
-   `public.accept_invitation(token)` checks the hash, expiry, single use and that the address matches
-   the signed-in user's.
+   org and owner membership in a trigger on `auth.users`, in the same transaction as the user.
 5. **Org slugs never take a top-level route's name** (`login`, `welcome`, `invite`…), because those
    routes shadow `/[orgSlug]`.
-6. **`EMAIL_DELIVERY=console`** was added so local development does not need a Resend key. It is
-   refused on a Vercel production deploy (`VERCEL_ENV=production`), not on `NODE_ENV=production`,
-   because `next build` always sets the latter.
-7. **The seed creates users through Supabase Auth's normal sign-up**, so it needs the Supabase stack
-   running. It uses the anon key, not the service role.
+6. **`EMAIL_DELIVERY=console`** lets local development run without a Resend key. It is refused on
+   a Vercel production deploy (`VERCEL_ENV=production`), not on `NODE_ENV=production`, because
+   `next build` always sets the latter.
+7. **Failed form submissions echo their values back** (never passwords or tokens). React 19 resets
+   a form after its action runs, so without this a mistyped password also wiped the email field.
+   Found by driving sign-in against real Supabase Auth; covered by an e2e test.
+8. **A pending invitation is checked before insert, not caught on conflict.** Catching the
+   unique violation inside the transaction does not work: the transaction is already aborted and
+   the commit re-throws. An expired, unaccepted invitation is cleared so the address can be
+   re-invited.
+
+## Product decisions made during the build: confirm or change
+
+- Invitations expire after **7 days**.
+- Only owners can grant, change or remove the owner role; admins manage everyone else.
+- A signed-in user with no org lands on `/welcome` to create one; the org switcher links there too.
+- Re-inviting an existing member is refused; accepting an invitation when already a member keeps
+  the existing role.
 
 ## Acceptance status
 
 | Criterion | Status |
 |---|---|
 | `pnpm build`, `pnpm lint`, `pnpm typecheck` pass clean | Verified |
-| New user signs up and lands in their own org as `owner` | DB side verified (sign-up trigger, RLS suite). Not yet run against live Supabase Auth |
-| Owner invites by email; invitee accepts with the right role | Verified in a browser against the built app and Postgres, with a stubbed Auth endpoint |
-| Non-member gets 404, not 403, at `/[orgSlug]` | Verified (same stubbed-Auth run): member 200, non-member 404, unknown org 404 |
-| RLS: A cannot select/insert/update/delete B's `organization`, `membership`, `invitation` | Verified (`pnpm test:rls`); the suite fails when a policy is weakened |
+| New user signs up and lands in their own org as `owner` | Verified end to end against Supabase Auth (GoTrue built from current source) and Postgres 16 (`tests/e2e`) |
+| Owner invites by email; invitee accepts with the right role | Verified: e2e for the invite; invitee sign-up through the invite link and acceptance driven in a browser against real Auth |
+| Non-member gets 404, not 403, at `/[orgSlug]` | Verified (`tests/e2e`): 404 status and the not-found page |
+| RLS: A cannot select/insert/update/delete B's `organization`, `membership`, `invitation` | Verified (`pnpm test`); the suite fails when a policy is weakened |
 | Service-role key in no Client Component or `NEXT_PUBLIC_` var | Enforced by `tests/unit/secrets-boundary.test.ts` |
 | A missing env var fails `pnpm build` | Verified |
-| `pnpm db:seed` produces a working two-org dataset | Written; needs `supabase start` to run |
-| Deploy to Vercel with a preview per PR | Not done: needs the Vercel and Supabase projects to be connected |
+| `pnpm db:seed` produces a working two-org dataset | Verified against real Auth: two orgs, three users, a cross-org member and a pending invitation; re-running is safe |
+| Deploy to Vercel with a preview per PR | Not done: needs the Vercel and Supabase projects connected |
+
+Not verified: the password-reset email round trip. It needs an SMTP catcher (`supabase start`
+provides Inbucket); the request and update-password pages render and validate.

@@ -14,7 +14,7 @@ export default async function Home() {
   return (
     <main className="mx-auto flex min-h-dvh max-w-2xl flex-col justify-center px-4 py-16">
       <p className="text-sm font-semibold tracking-wide text-muted-foreground">TRESTLE</p>
-      <h1 className="mt-4 text-3xl font-semibold text-balance">
+      <h1 className="mt-4 text-xl font-semibold text-balance">
         The work before the build, as a methodology rather than a pile of spreadsheets.
       </h1>
       <p className="mt-4 text-muted-foreground">
