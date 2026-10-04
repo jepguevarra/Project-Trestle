@@ -26,12 +26,11 @@ Every feature must be defensible as "a consultant would bill for this."
 
 ## Current state
 
-Phase 01 (foundations) is built: auth, organisations, membership, invitations, RLS and the RLS test
-harness. Its build notes and acceptance status are at the end of
-`docs/plan/phase-01-foundations.md`. `docs/plan/` holds the phase-by-phase build order, phases
+Phases 01 (foundations) and 02 (clients and engagements) are built. Each phase file ends with its
+build notes and acceptance status. `docs/plan/` holds the phase-by-phase build order, phases
 01–12. **Do not skip ahead.** Each phase depends on the schema and primitives of the ones before it.
 
-Next is `docs/plan/phase-02-clients-engagements.md`. Phase 05 is the first sellable point. Phases
+Next is `docs/plan/phase-03-instrument-engine.md`. Phase 05 is the first sellable point. Phases
 01–05 are the capstone's minimum evaluation target.
 
 Tenant queries run inside `withRls` (`lib/db`), which switches to Supabase's `authenticated` role

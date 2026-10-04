@@ -48,6 +48,9 @@ engagement_assignment   consultant/viewer scoping
   unique (engagement_id, user_id)
 ```
 
+References between tenant tables are composite `(id, org_id)` foreign keys (as built, phase 02):
+FK checks ignore RLS, so a single-column FK would let a row in org A point at org B's row.
+
 **`engagement.type` drives four things** and must exist from the first migration that creates
 `engagement`: which modules appear, which instrument template is offered, which pattern library is in
 scope, and whether fit-gap applies (see `POSITIONING.md` §4). Adding it later means backfilling live
@@ -453,8 +456,20 @@ create policy engagement_scope on <engagement_scoped_table>
   );
 ```
 
-`viewer` is additionally denied writes by the server action wrapper, not by RLS alone — RLS protects
-rows, the wrapper protects verbs.
+**As built (phase 02).** The sketch above, added as a second permissive policy next to
+`tenant_isolation`, would *widen* access: Postgres ORs permissive policies. Engagement-scoped tables
+instead carry one policy per verb that includes both predicates, using helpers from
+`drizzle/0001_clients_engagements.sql`:
+
+| Helper | Returns |
+|---|---|
+| `private.assigned_engagement_ids()` | Engagements the user is assigned to |
+| `private.editable_engagement_ids()` | Engagements a consultant is assigned to with `edit` |
+| `private.engagement_access(id)` | `'edit'`, `'read'` or null; admins always `'edit'`, viewers never |
+
+`viewer` is denied writes in RLS as well as by the server action wrapper, because the Data API
+reaches the tables directly. RLS protects rows; the wrapper also protects verbs. Archived
+engagements are read-only to non-admins in RLS too.
 
 ### The anonymous respondent path
 

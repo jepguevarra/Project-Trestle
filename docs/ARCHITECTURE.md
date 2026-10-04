@@ -97,6 +97,9 @@ must go through `withRls`; the Supabase JS client is used for Auth only. The app
 `org_id` from a request body; it resolves the org from the URL slug and verifies membership in
 `lib/auth`. Org-scoped Server Actions go through `orgAction` (`lib/auth/action.ts`), which
 validates with Zod, then checks membership and role, then runs the handler inside `withRls`.
+Engagement pages use `requireEngagementAccess` and engagement-scoped actions use
+`engagementAction` (`lib/auth/engagement.ts`): no access is a 404, and an archived engagement is
+read-only.
 
 **Anonymous respondent.** Browser → `app/api/public/survey/[token]` → verify signed token →
 service-role Supabase client → write scoped strictly to that respondent's row. RLS is bypassed
