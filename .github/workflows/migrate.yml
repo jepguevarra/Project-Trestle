@@ -1,0 +1,53 @@
+name: Migrate
+
+# Applies drizzle/ migrations to the hosted databases. Pushes to `staging` migrate the staging
+# Supabase project (which Vercel previews use); pushes to `main` migrate production. Run it by hand
+# from the Actions tab to migrate staging ahead of merging a PR that adds a migration.
+#
+# Each GitHub environment (`staging`, `production`) needs a DATABASE_URL secret: the Supabase
+# *session pooler* or direct connection string (port 5432), not the transaction pooler. Until the
+# secret exists the job skips with a notice.
+
+on:
+  push:
+    branches: [staging, main]
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: Database to migrate
+        type: choice
+        options: [staging, production]
+        default: staging
+
+concurrency:
+  group: migrate-${{ github.event.inputs.environment || github.ref_name }}
+  cancel-in-progress: false
+
+jobs:
+  migrate:
+    runs-on: ubuntu-latest
+    environment: ${{ github.event.inputs.environment || (github.ref_name == 'main' && 'production' || 'staging') }}
+    env:
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
+    steps:
+      - id: configured
+        run: |
+          if [ -z "$DATABASE_URL" ]; then
+            echo "::notice::No DATABASE_URL secret for this environment; skipping. See docs/DEPLOY.md."
+            echo "ok=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "ok=true" >> "$GITHUB_OUTPUT"
+          fi
+      - if: steps.configured.outputs.ok == 'true'
+        uses: actions/checkout@v4
+      - if: steps.configured.outputs.ok == 'true'
+        uses: pnpm/action-setup@v4
+      - if: steps.configured.outputs.ok == 'true'
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - if: steps.configured.outputs.ok == 'true'
+        run: pnpm install --frozen-lockfile
+      - if: steps.configured.outputs.ok == 'true'
+        run: pnpm db:migrate

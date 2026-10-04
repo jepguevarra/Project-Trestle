@@ -35,4 +35,13 @@ describe("parseEnv", () => {
     expect(() => parseEnv({ ...valid, VERCEL_ENV: "production" })).toThrow("EMAIL_DELIVERY");
     expect(parseEnv({ ...valid, NODE_ENV: "production" }).EMAIL_DELIVERY).toBe("console");
   });
+
+  it("derives APP_URL from the branch URL on a Vercel preview, and only there", () => {
+    const { APP_URL: _drop, ...noUrl } = valid;
+    const preview = { ...noUrl, VERCEL_ENV: "preview", VERCEL_BRANCH_URL: "trestle-git-feature.vercel.app", VERCEL_URL: "x.vercel.app" };
+    expect(parseEnv(preview).APP_URL).toBe("https://trestle-git-feature.vercel.app");
+    expect(parseEnv({ ...preview, VERCEL_BRANCH_URL: undefined }).APP_URL).toBe("https://x.vercel.app");
+    expect(parseEnv({ ...preview, APP_URL: "https://staging.example.com" }).APP_URL).toBe("https://staging.example.com");
+    expect(() => parseEnv({ ...noUrl, VERCEL_ENV: "production", EMAIL_DELIVERY: "resend", RESEND_API_KEY: "re_1" })).toThrow("APP_URL");
+  });
 });

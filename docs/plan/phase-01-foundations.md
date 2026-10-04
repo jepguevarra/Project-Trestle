@@ -96,7 +96,7 @@ Approved by the product owner, along with the dependencies added in this phase (
 | Service-role key in no Client Component or `NEXT_PUBLIC_` var | Enforced by `tests/unit/secrets-boundary.test.ts` |
 | A missing env var fails `pnpm build` | Verified |
 | `pnpm db:seed` produces a working two-org dataset | Verified against real Auth: two orgs, three users, a cross-org member and a pending invitation; re-running is safe |
-| Deploy to Vercel with a preview per PR | Not done: needs the Vercel and Supabase projects connected |
+| Deploy to Vercel with a preview per PR | Prepared: `docs/DEPLOY.md`, preview `APP_URL` derived from the branch URL, migrations workflow. Waiting on the Vercel and Supabase accounts |
 
 Not verified: the password-reset email round trip. It needs an SMTP catcher (`supabase start`
 provides Inbucket); the request and update-password pages render and validate.

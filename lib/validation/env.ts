@@ -28,8 +28,19 @@ export const envSchema = z
 
 export type Env = z.infer<typeof envSchema>;
 
+/**
+ * On a Vercel preview, each deploy has its own URL, so APP_URL (used in emailed links and Supabase
+ * Auth redirects) defaults to the branch URL Vercel provides. Production and local runs must set
+ * APP_URL explicitly.
+ */
+function withDerivedAppUrl(source: Record<string, string | undefined>) {
+  if (source.APP_URL || source.VERCEL_ENV !== "preview") return source;
+  const host = source.VERCEL_BRANCH_URL || source.VERCEL_URL;
+  return host ? { ...source, APP_URL: `https://${host}` } : source;
+}
+
 export function parseEnv(source: Record<string, string | undefined>): Env {
-  const result = envSchema.safeParse(source);
+  const result = envSchema.safeParse(withDerivedAppUrl(source));
   if (!result.success) {
     const lines = result.error.issues.map((i) => `  - ${i.path.join(".") || "(root)"}: ${i.message}`);
     throw new Error(`Invalid environment configuration:\n${lines.join("\n")}\nSee .env.example.`);

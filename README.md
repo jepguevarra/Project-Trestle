@@ -41,6 +41,10 @@ pnpm test:e2e                        # Playwright; needs `supabase start` and `p
 The RLS suite creates and drops its own database. It never skips: without `TEST_DATABASE_URL` it
 fails.
 
+## Deploying
+
+Vercel + Supabase, with a preview per PR: see [`docs/DEPLOY.md`](docs/DEPLOY.md).
+
 ## Branches
 
 - `main`: stable, production-ready code
