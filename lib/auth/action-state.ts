@@ -8,6 +8,12 @@ export type ActionState = {
    * after its action runs, which would otherwise wipe the user's input on every error.
    */
   values?: Record<string, string>;
+  /**
+   * Set by a handler to navigate after a successful write. The wrappers redirect only once the
+   * transaction has committed: Next's redirect() throws, and throwing inside `withRls` would roll
+   * the write back.
+   */
+  redirectTo?: string;
 };
 
 export const idle: ActionState = { ok: false };

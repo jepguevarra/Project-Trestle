@@ -1,4 +1,5 @@
 import "server-only";
+import { redirect } from "next/navigation";
 import type { z } from "zod";
 import type { Tx } from "@/lib/db";
 import { withRls } from "@/lib/db";
@@ -29,6 +30,7 @@ type Handler<S extends z.ZodType> = (
 export function orgAction<S extends z.ZodType>(minRole: Role, schema: S, handler: Handler<S>) {
   return async (orgSlug: string, prev: ActionState, formData: FormData): Promise<ActionState> => {
     const result = await run(orgSlug, prev, formData);
+    if (result.ok && result.redirectTo) redirect(result.redirectTo as never);
     return result.ok ? result : { ...result, values: echoValues(formData) };
   };
 

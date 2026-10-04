@@ -29,7 +29,7 @@ export function InviteForm({
       />
       <div className="grid gap-1.5">
         <Label htmlFor="invite-role">Role</Label>
-        <Select id="invite-role" name="role" defaultValue={state.values?.role ?? "consultant"}>
+        <Select key={state.values?.role ?? "consultant"} id="invite-role" name="role" defaultValue={state.values?.role ?? "consultant"}>
           {roles.map((r) => (
             <option key={r} value={r}>
               {ROLE_LABELS[r]}

@@ -54,3 +54,12 @@ export async function findUnacceptedInvitation(tx: Tx, orgId: string, email: str
     );
   return row ?? null;
 }
+
+/** A user's role in the org, or null if they are not a member. */
+export async function findMemberRoleByUserId(tx: Tx, orgId: string, userId: string): Promise<Role | null> {
+  const [row] = await tx
+    .select({ role: membership.role })
+    .from(membership)
+    .where(and(eq(membership.orgId, orgId), eq(membership.userId, userId)));
+  return row?.role ?? null;
+}

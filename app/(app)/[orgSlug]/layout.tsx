@@ -25,6 +25,12 @@ export default async function OrgLayout({ children, params }: { children: ReactN
             <Link href={base as never} className="rounded-md px-2 py-1 hover:bg-muted">
               Dashboard
             </Link>
+            <Link href={`${base}/engagements` as never} className="rounded-md px-2 py-1 hover:bg-muted">
+              Engagements
+            </Link>
+            <Link href={`${base}/clients` as never} className="rounded-md px-2 py-1 hover:bg-muted">
+              Clients
+            </Link>
             <Link href={`${base}/settings/members` as never} className="rounded-md px-2 py-1 hover:bg-muted">
               Members
             </Link>
