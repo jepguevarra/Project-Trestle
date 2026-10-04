@@ -30,6 +30,8 @@ export function pgErrorMessage(err: unknown): string | undefined {
       return "This invitation was sent to a different email address. Sign in with that address to accept it.";
     case "TR404":
       return "This invitation is invalid, has already been used, or has expired.";
+    case "TR405":
+      return "Only an admin can change an engagement's client, type or status.";
     case "TR409":
       return "An organisation must keep at least one owner.";
     default:
