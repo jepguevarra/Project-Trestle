@@ -73,7 +73,10 @@ Where the build departed from the plan or the docs, and why. Per `README.md` ste
    the commit re-throws. An expired, unaccepted invitation is cleared so the address can be
    re-invited.
 
-## Product decisions made during the build: confirm or change
+## Product decisions made during the build
+
+Approved by the product owner, along with the dependencies added in this phase (`postgres`,
+`clsx`, `tailwind-merge`, `class-variance-authority`, `server-only`, `dotenv`, `tsx`).
 
 - Invitations expire after **7 days**.
 - Only owners can grant, change or remove the owner role; admins manage everyone else.
