@@ -4,14 +4,14 @@ import { and, eq, isNull, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
 import { generateInvitationToken, hashInvitationToken, INVITATION_TTL_MS } from "../tokens/invitation";
-import { invitation, membership, organization } from "./schema";
+import { client, engagement, engagementAssignment, invitation, membership, organization } from "./schema";
 import * as schema from "./schema";
 
 config({ path: [".env.local", ".env"], quiet: true });
 
 /**
- * `pnpm db:seed` — two orgs, three users and a pending invitation, so a fresh clone is usable in
- * one command.
+ * `pnpm db:seed` — two orgs, three users, a pending invitation, and per org two clients with an
+ * engagement each (of different types), so a fresh clone is usable in one command.
  *
  * Users are created through Supabase Auth's normal sign-up (anon key), so the real sign-up trigger
  * creates each owner's org. Cross-org memberships are then added with the owner connection. Safe
@@ -32,8 +32,8 @@ async function main() {
   const dbUrl = process.env.DATABASE_URL;
   if (!url || !anonKey || !dbUrl) throw new Error("Set NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_ANON_KEY and DATABASE_URL.");
 
-  const client = postgres(dbUrl, { max: 1, onnotice: () => {} });
-  const db = drizzle(client, { schema });
+  const connection = postgres(dbUrl, { max: 1, onnotice: () => {} });
+  const db = drizzle(connection, { schema });
 
   const ids: Record<string, string> = {};
   for (const u of USERS) {
@@ -74,29 +74,106 @@ async function main() {
     if (!m) await db.insert(membership).values({ orgId, userId, role });
   }
 
+  // Clients and engagements (phase 02). Found by name, so re-running changes nothing.
+  type EngagementSeed = {
+    name: string;
+    type: (typeof engagement.$inferInsert)["type"];
+    targetSystem: string;
+    targetGoLive: string | null;
+  };
+  const ensureEngagement = async (
+    orgId: string,
+    clientSeed: { name: string; industry: string; sizeBand: "micro" | "small" | "medium" | "large" },
+    e: EngagementSeed,
+    createdBy: string,
+  ) => {
+    const [existingClient] = await db
+      .select({ id: client.id })
+      .from(client)
+      .where(and(eq(client.orgId, orgId), eq(client.name, clientSeed.name)));
+    const clientId =
+      existingClient?.id ?? (await db.insert(client).values({ orgId, ...clientSeed }).returning({ id: client.id }))[0]!.id;
+
+    const [existing] = await db
+      .select({ id: engagement.id, name: engagement.name })
+      .from(engagement)
+      .where(and(eq(engagement.orgId, orgId), eq(engagement.name, e.name)));
+    if (existing) return existing;
+    const [created] = await db
+      .insert(engagement)
+      .values({ orgId, clientId, createdBy, ...e })
+      .returning({ id: engagement.id, name: engagement.name });
+    return created!;
+  };
+  const assign = (orgId: string, engagementId: string, userId: string, access: "edit" | "read") =>
+    db.insert(engagementAssignment).values({ orgId, engagementId, userId, access }).onConflictDoNothing();
+
+  const alice = ids["alice@acme.test"]!;
+  const bob = ids["bob@beacon.test"]!;
+  const carol = ids["carol@freelance.test"]!;
+
+  const odoo = await ensureEngagement(
+    acme.id,
+    { name: "Harbour Foods Distribution", industry: "Distribution and wholesale", sizeBand: "medium" },
+    { name: "Odoo 18 rollout", type: "packaged_software", targetSystem: "Odoo 18", targetGoLive: "2027-04-01" },
+    alice,
+  );
+  await ensureEngagement(
+    acme.id,
+    { name: "Northline Fabrication", industry: "Manufacturing", sizeBand: "small" },
+    { name: "Job costing off spreadsheets", type: "digitalisation", targetSystem: "Odoo 18 Manufacturing", targetGoLive: null },
+    alice,
+  );
+  await ensureEngagement(
+    beacon.id,
+    { name: "Cebu Coastal Hotels", industry: "Hospitality and food service", sizeBand: "medium" },
+    { name: "Finance platform migration", type: "platform_migration", targetSystem: "NetSuite", targetGoLive: "2027-01-15" },
+    bob,
+  );
+  const intake = await ensureEngagement(
+    beacon.id,
+    { name: "Meridian Clinics", industry: "Healthcare", sizeBand: "small" },
+    { name: "Patient intake automation", type: "automation", targetSystem: "Power Automate", targetGoLive: null },
+    bob,
+  );
+  // Carol edits one Acme engagement and has read access to one Beacon engagement as a viewer.
+  await assign(acme.id, odoo.id, carol, "edit");
+  await assign(beacon.id, intake.id, carol, "read");
+
   // A pending invitation, so the members page and the accept flow have something to show. The
   // token is stored only as a hash, so a re-run replaces the invitation and prints a fresh link.
   const inviteeEmail = "dave@newhire.test";
-  const token = generateInvitationToken();
-  await db
-    .delete(invitation)
-    .where(and(eq(invitation.orgId, acme.id), eq(invitation.email, inviteeEmail), isNull(invitation.acceptedAt)));
-  await db.insert(invitation).values({
-    orgId: acme.id,
-    email: inviteeEmail,
-    role: "consultant",
-    tokenHash: hashInvitationToken(token),
-    expiresAt: new Date(Date.now() + INVITATION_TTL_MS),
-    invitedBy: ids["alice@acme.test"]!,
-  });
+  const alreadyMember = await db.execute(sql`
+    select 1 from membership m join auth.users u on u.id = m.user_id
+    where m.org_id = ${acme.id} and u.email = ${inviteeEmail}
+  `);
+  const token = alreadyMember.length ? null : generateInvitationToken();
+  if (token) {
+    await db
+      .delete(invitation)
+      .where(and(eq(invitation.orgId, acme.id), eq(invitation.email, inviteeEmail), isNull(invitation.acceptedAt)));
+    await db.insert(invitation).values({
+      orgId: acme.id,
+      email: inviteeEmail,
+      role: "consultant",
+      tokenHash: hashInvitationToken(token),
+      expiresAt: new Date(Date.now() + INVITATION_TTL_MS),
+      invitedBy: ids["alice@acme.test"]!,
+    });
+  }
 
-  await client.end();
+  await connection.end();
   console.log(`Seeded. Sign in with any of these, password "${PASSWORD}":`);
   console.log(`  alice@acme.test       owner of ${acme.name} (/${acme.slug})`);
   console.log(`  bob@beacon.test       owner of ${beacon.name} (/${beacon.slug})`);
-  console.log(`  carol@freelance.test  consultant at ${acme.name}, viewer at ${beacon.name}`);
+  console.log(`  carol@freelance.test  consultant at ${acme.name} (edits "${odoo.name}"),`);
+  console.log(`                        viewer at ${beacon.name} (reads "${intake.name}")`);
   const appUrl = process.env.APP_URL ?? "http://localhost:3000";
-  console.log(`Pending invitation for ${inviteeEmail} (consultant at ${acme.name}): ${appUrl}/invite/${token}`);
+  console.log(
+    token
+      ? `Pending invitation for ${inviteeEmail} (consultant at ${acme.name}): ${appUrl}/invite/${token}`
+      : `${inviteeEmail} has already accepted their invitation to ${acme.name}.`,
+  );
 }
 
 main().catch((err: unknown) => {

@@ -1,21 +1,8 @@
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test } from "@playwright/test";
+import { PASSWORD, signUp } from "./fixtures";
 
 // Phase 01 flows, per ARCHITECTURE.md's E2E list: sign up and create an org. Needs `supabase start`
 // with email confirmation off (the local default) so sign-up signs the user straight in.
-
-const PASSWORD = "e2e-password-123";
-
-async function signUp(page: Page, label: string) {
-  const stamp = `${Date.now()}${Math.floor(Math.random() * 1000)}`;
-  const email = `${label}.${stamp}@e2e.test`;
-  await page.goto("/signup");
-  await page.getByLabel("Firm name").fill(`E2E ${label} ${stamp}`);
-  await page.getByLabel("Work email").fill(email);
-  await page.getByLabel("Password").fill(PASSWORD);
-  await page.getByRole("button", { name: "Create account" }).click();
-  await expect(page).toHaveURL(new RegExp(`/e2e-${label}-${stamp}$`));
-  return { email, slug: new URL(page.url()).pathname.slice(1) };
-}
 
 test("signing up creates an organisation and lands in it as owner", async ({ page }) => {
   const { email } = await signUp(page, "owner");
