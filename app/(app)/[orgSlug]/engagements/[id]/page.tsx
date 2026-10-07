@@ -65,7 +65,10 @@ export default async function EngagementOverview({ params }: { params: Promise<{
           <h2 id="team-heading" className="text-sm font-semibold">
             Team
           </h2>
-          <p className="text-sm text-muted-foreground">Owners and admins can open every engagement and are not listed.</p>
+          <p className="text-sm text-muted-foreground">
+            Who can open this engagement. Owners and admins always can, so they are not listed. Invite
+            new people from Members first, then add them here.
+          </p>
         </div>
         {team.length ? (
           <Table>
@@ -104,6 +107,18 @@ export default async function EngagementOverview({ params }: { params: Promise<{
           <p className="text-sm text-muted-foreground">Nobody is assigned yet.</p>
         )}
         {isAdmin && candidates.length ? <AssignForm action={bind(assignMember)} candidates={candidates} /> : null}
+      </section>
+
+      <section aria-labelledby="next-heading" className="grid gap-1">
+        <h2 id="next-heading" className="text-sm font-semibold">
+          What goes here
+        </h2>
+        <p className="max-w-2xl text-sm text-muted-foreground">
+          This engagement will hold the readiness assessment (a survey of the client&apos;s staff, scored
+          by dimension), then the stakeholder map, change impacts, process documentation and
+          requirements. They are being built in that order; the readiness assessment is next, and each
+          will appear as a tab above when it is ready.
+        </p>
       </section>
 
       {isAdmin ? (

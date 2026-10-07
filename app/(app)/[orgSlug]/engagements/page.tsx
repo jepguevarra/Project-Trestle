@@ -35,8 +35,10 @@ export default async function EngagementsPage({
     <div className="grid gap-8">
       <div>
         <h1 className="text-xl font-semibold">Engagements</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          {isAdmin ? "Every engagement in this organisation." : "Engagements you are assigned to."}
+        <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
+          An engagement is one piece of work for a client, such as an Odoo rollout or a move off
+          spreadsheets. {isAdmin ? "You see every engagement in the firm." : "You see the engagements you have been added to."}{" "}
+          Finished work can be archived: it stays readable but no longer counts as active.
         </p>
       </div>
 

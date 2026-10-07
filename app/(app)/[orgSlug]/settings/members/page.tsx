@@ -30,6 +30,22 @@ export default async function MembersPage({ params }: { params: Promise<{ orgSlu
         <p className="mt-1 text-sm text-muted-foreground">People in {org.name} and what they can do.</p>
       </div>
 
+      <section aria-labelledby="roles-heading">
+        <h2 id="roles-heading" className="mb-2 text-sm font-semibold">
+          Roles
+        </h2>
+        <dl className="grid gap-x-6 gap-y-1 text-sm sm:grid-cols-[max-content_1fr]">
+          <dt className="font-semibold">Owner</dt>
+          <dd className="text-muted-foreground">Everything an admin can do, and manages other owners.</dd>
+          <dt className="font-semibold">Admin</dt>
+          <dd className="text-muted-foreground">Adds clients and engagements, invites people, sees every engagement.</dd>
+          <dt className="font-semibold">Consultant</dt>
+          <dd className="text-muted-foreground">Works on the engagements they are added to; sees nothing else.</dd>
+          <dt className="font-semibold">Viewer</dt>
+          <dd className="text-muted-foreground">Reads the engagements they are added to. Usually the client&apos;s sponsor.</dd>
+        </dl>
+      </section>
+
       {canManage ? (
         <section aria-labelledby="invite-heading" className="rounded-md border border-border bg-card p-4">
           <h2 id="invite-heading" className="mb-3 text-sm font-semibold">

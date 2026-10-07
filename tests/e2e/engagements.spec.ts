@@ -90,3 +90,19 @@ test("archiving removes an engagement from the active list and leaves it readabl
   await page.getByRole("button", { name: "Re-activate engagement" }).click();
   await expect(page.getByRole("button", { name: "Save details" })).toBeVisible();
 });
+
+test("a new admin gets a getting-started checklist that tracks progress", async ({ page }) => {
+  const { slug } = await signUp(page, "newcomer");
+  await expect(page.getByRole("heading", { name: "Getting started" })).toBeVisible();
+  await expect(page.getByText("0 of 4 done")).toBeVisible();
+
+  await page.getByRole("link", { name: "Add a client" }).click();
+  await expect(page).toHaveURL(new RegExp(`/${slug}/clients#new-client$`));
+  await page.getByLabel("Name").fill("First client");
+  await page.getByRole("button", { name: "Add client" }).click();
+  await expect(page.getByRole("heading", { level: 1, name: "First client" })).toBeVisible();
+
+  await page.goto(`/${slug}`);
+  await expect(page.getByText("1 of 4 done")).toBeVisible();
+  await expect(page.getByRole("link", { name: "Create an engagement" })).toBeVisible();
+});

@@ -22,7 +22,10 @@ export default async function ClientsPage({ params }: { params: Promise<{ orgSlu
     <div className="grid gap-8">
       <div>
         <h1 className="text-xl font-semibold">Clients</h1>
-        <p className="mt-1 text-sm text-muted-foreground">The companies {org.name} prepares for a new system.</p>
+        <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
+          A client is a company {org.name} is helping through a system change. Add the client once,
+          then create one or more engagements for them on the Engagements page.
+        </p>
       </div>
 
       {clients.length === 0 ? (
