@@ -92,6 +92,8 @@ export async function expectCrossTenantDenied(
     targetId: string;
     insertRow: Record<string, unknown>;
     updateSet: Record<string, unknown>;
+    /** Append-only tables grant no UPDATE or DELETE at all, so those are refused outright. */
+    appendOnly?: boolean;
   },
 ) {
   const { actor, table, targetId } = opts;
@@ -106,13 +108,21 @@ export async function expectCrossTenantDenied(
     RLS_VIOLATION,
   );
 
-  const updated = await asUser(db, actor, (tx) =>
-    tx.update(table).set(opts.updateSet as never).where(eq(table.id, targetId)).returning(),
-  );
-  expect(updated, "update must affect nothing").toHaveLength(0);
+  if (opts.appendOnly) {
+    await expectPgError(
+      asUser(db, actor, (tx) => tx.update(table).set(opts.updateSet as never).where(eq(table.id, targetId))),
+      RLS_VIOLATION,
+    );
+    await expectPgError(asUser(db, actor, (tx) => tx.delete(table).where(eq(table.id, targetId))), RLS_VIOLATION);
+  } else {
+    const updated = await asUser(db, actor, (tx) =>
+      tx.update(table).set(opts.updateSet as never).where(eq(table.id, targetId)).returning(),
+    );
+    expect(updated, "update must affect nothing").toHaveLength(0);
 
-  const deleted = await asUser(db, actor, (tx) => tx.delete(table).where(eq(table.id, targetId)).returning());
-  expect(deleted, "delete must affect nothing").toHaveLength(0);
+    const deleted = await asUser(db, actor, (tx) => tx.delete(table).where(eq(table.id, targetId)).returning());
+    expect(deleted, "delete must affect nothing").toHaveLength(0);
+  }
 
   const after = await db.select().from(table).where(eq(table.id, targetId));
   expect(after, "row must be unchanged").toEqual(before);

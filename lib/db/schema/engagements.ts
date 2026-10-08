@@ -16,6 +16,9 @@ export const engagementType = pgEnum("engagement_type", [
 ]);
 export const engagementStatus = pgEnum("engagement_status", ["active", "archived"]);
 export const engagementAccess = pgEnum("engagement_access", ["edit", "read"]);
+// The OCM lifecycle stage (OCM-MODULE.md §4.1). Set by the consultant, never computed. Separate from
+// `status`, which stays the pricing meter: reaching `exit` does not archive.
+export const ocmStage = pgEnum("ocm_stage", ["assess", "develop", "deploy", "normalize", "exit"]);
 
 const timestamps = {
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
@@ -59,6 +62,14 @@ export const engagement = pgTable(
     targetGoLive: date("target_go_live"),
     // The plan meter (BUSINESS-MODEL.md §5): active counts against the plan, archived never does.
     status: engagementStatus("status").notNull().default("active"),
+    // Project Essentials (phase 02b, OCM-MODULE.md §5.1).
+    ocmStage: ocmStage("ocm_stage").notNull().default("assess"),
+    startDate: date("start_date"),
+    endDate: date("end_date"),
+    objectives: text("objectives"),
+    scopeSummary: text("scope_summary"),
+    successCriteria: text("success_criteria"),
+    transitionOwner: text("transition_owner"),
     createdBy: uuid("created_by").references(() => authUsers.id, { onDelete: "set null" }),
     ...timestamps,
   },

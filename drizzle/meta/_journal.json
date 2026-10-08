@@ -15,6 +15,13 @@
       "when": 1791073650376,
       "tag": "0001_clients_engagements",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1791437045669,
+      "tag": "0002_view_kit",
+      "breakpoints": true
     }
   ]
 }
