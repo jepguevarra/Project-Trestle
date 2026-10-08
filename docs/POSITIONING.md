@@ -230,3 +230,63 @@ processes that system will replace, and traces both into what the system must do
 
 Then concede the boundary out loud, because it makes the rest credible: for a reorganisation with no
 system attached, Prosci's toolkit is the better fit, and Trestle does not compete for it.
+
+---
+
+## 9. Lifecycle depth: the second axis (October 2026)
+
+§1 settles the product's **width**: which kinds of change it covers. Adopting the OCM lifecycle
+(`OCM-MODULE.md`) settles a different question, its **depth**: how far along one change Trestle
+stays. The decision is **all five OCM phases** (Assess → Develop → Deploy → Normalize → Exit). Width
+does not move: L2 default, L3 ceiling, never L4.
+
+### 9.1 The boundary that survives
+
+> Trestle hands the **requirements** to the build team at the scope baseline. It stays with the
+> **people** through go-live and exit.
+
+`BA-LAYER.md` §4.1 still holds: no sprints, no story monitoring, no delivery tracking of the build.
+What extends is communications, events, champions, training, go/no-go and adoption, which is the
+people side of the same system change. The checklist is a method, not a project plan.
+
+### 9.2 A correction the panel will otherwise make for you
+
+`RESEARCH.md` §3.1 files OCM Solution under *methodology + templates*, "sold as content and training,
+not software", and §3.3 lists "Prosci or OCM Solution ships proper software" as a future risk.
+**That risk has already happened.** OCM Solution runs a subscription portal (reviewed October 2026)
+with phased tools, an audience register, impacts, stakeholders, readiness surveys, champions,
+training, go-live assessment and change-metrics reports. Both passages need amending before the
+defense.
+
+What the gap in `RESEARCH.md` §3.2 still rests on, checked against that portal:
+
+| Claim | Still true? |
+|---|---|
+| (a) Pre-implementation | **No longer the differentiator.** Trestle now spans the lifecycle too |
+| (b) Sold to the implementation partner as a multi-client workspace | Yes. OCMS organises one change team's projects; it is not partner tenancy with client-scoped access |
+| (c) Theory-grounded instrument | Yes. OCMS ships practitioner survey templates; no dimensional model, reliability or consensus measures |
+| (d) Readiness, stakeholders and impacts joined to **processes and requirements** in one model | Yes, and now the centre of the claim. OCMS has no process or requirement layer |
+
+Reword the claim around (b), (c) and (d). Something like:
+
+> OCM software exists, and it manages change as a stand-alone discipline. Nothing joins the people
+> side of a system change to the processes being replaced and the requirements being specified, in a
+> workspace sold to the partner who does both.
+
+### 9.3 What depth costs
+
+| Gain | Cost |
+|---|---|
+| One tool from discovery to exit, so the client never meets a second platform | Direct overlap with OCMS, Prosci tooling and The Change Compass on OCM delivery |
+| Readiness waves and adoption surveys make the instrument longitudinal | Roughly double the build (phases 02b, 13–20) |
+| Go/no-go gated on evidence from both the people and the scope side | Larger surface to keep plain; the view kit (`OCM-MODULE.md` §7.7) is what keeps it affordable |
+| Recurring use through Deploy and Normalize helps retention between engagements (`BUSINESS-MODEL.md` §6) | Weaker "pre-implementation" story for the capstone; lead with (d) instead |
+
+### 9.4 Doc debt from this section
+
+| Doc | Action |
+|---|---|
+| `CLAUDE.md`, `PRD.md` | **Changed** for lifecycle depth |
+| `RESEARCH.md` §3.1, §3.2, §3.3 | **Your call, before the defense.** Reclassify OCM Solution and reword the gap per §9.2 |
+| `TOOL-LANDSCAPE.md` matrix | Add OCM Solution as software, scored on the same columns |
+| `DASHBOARD.md` §0 ("Trestle ends at approved scope") | Narrow to: *requirements* end at approved scope; the roadmap now runs to exit |

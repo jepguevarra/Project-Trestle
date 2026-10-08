@@ -55,13 +55,16 @@ app/
       layout.tsx               org shell: nav, org switcher, membership guard
       page.tsx                 org dashboard
       clients/
-      engagements/[id]/
-        readiness/
-        stakeholders/
-        impacts/
-        processes/
-        report/
-      settings/                members, invitations, templates, branding
+      engagements/[id]/        home menu: the engagement's apps (OCM-MODULE.md §7.1)
+        [app]/                 collection view: list | kanban | calendar | timeline | graph
+          [recordId]/          form view with statusbar, smart buttons, chatter
+          new/
+                               apps: overview, checklist, audiences, stakeholders, impacts,
+                               readiness, resistance, communications, events, champions,
+                               training, go-live, status-reports, transition, sources,
+                               processes, requirements, data
+      reporting/               portfolio view across engagements (owner, admin)
+      settings/                members, invitations, templates, channels, library, branding
   api/
     public/
       survey/[token]/route.ts  anonymous respondent read + submit (service role)
@@ -69,8 +72,12 @@ app/
     webhooks/
 components/
   ui/                          shadcn primitives, unmodified
+  views/                       the Odoo-style view kit: app-shell, navbar, control-panel,
+                               list/kanban/form/timeline views, statusbar, smart-buttons,
+                               notebook, inline-list, chatter (OCM-MODULE.md §7.7)
   charts/                      recharts wrappers with the house style baked in
-  <feature>/                   feature components, colocated by module
+  <feature>/                   feature components, colocated by module — only what the
+                               view kit cannot express
 lib/
   auth/                        session, membership resolution, role guards
   db/
@@ -78,7 +85,10 @@ lib/
     queries/                   read functions, always take an explicit orgId
     mutations/                 write functions
     seed.ts
-  scoring/                     readiness + impact scoring, pure functions, unit tested
+  scoring/                     readiness, impact and OCM metrics, pure functions, unit tested
+  views/                       one typed config per model: fields, columns, filters, group-bys,
+                               stages, tracked fields, smart buttons; registry.ts lists res_types
+  ocm/                         fixed OCM lists (resistance keys, purposes) and suggest.ts
   tokens/                      signed respondent token mint + verify
   validation/                  zod schemas shared by forms and actions
 drizzle/                       generated migrations + hand-written RLS SQL

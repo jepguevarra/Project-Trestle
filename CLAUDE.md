@@ -4,11 +4,11 @@ Read this file first, every session. It is the contract for how work happens in 
 
 ## What Trestle is
 
-A multi-tenant SaaS for **pre-implementation change readiness** on technology-driven change.
+A multi-tenant SaaS for **change readiness and change management** on technology-driven change.
 Consulting firms use it to run the assessment and documentation work that should happen *before* a
 new system goes live: measuring whether an organisation is ready to change, mapping who is affected
 and how badly, capturing the processes that are about to be rebuilt, and specifying what the new
-system must do.
+system must do. It then carries the people side through deployment, go-live and exit.
 
 Scope is any engagement where a system is being introduced or replaced, existing ways of working
 will change, and someone has to specify what the new system must do — packaged software (ERP, CRM,
@@ -21,26 +21,37 @@ domain-general; the go-to-market is ERP-first, because that is where the founder
 credibility are. Their clients are mid-market companies implementing Odoo, SAP B1, NetSuite,
 Dynamics and their equivalents in other software categories.
 
+The product covers the whole OCM lifecycle (Assess → Develop → Deploy → Normalize → Exit; see
+`docs/OCM-MODULE.md`). It hands the **requirements** to the build team at the scope baseline and stays
+with the **people** through go-live and exit.
+
 The product is **not** an ERP, not a project-management tool, and not a generic survey platform.
-Every feature must be defensible as "a consultant would bill for this."
+The OCM checklist has phases, owners and due dates, and nothing more: no dependencies, effort,
+resourcing or sprints. Every feature must be defensible as "a consultant would bill for this."
 
 ## Current state
 
 Phases 01 (foundations) and 02 (clients and engagements) are built. Each phase file ends with its
-build notes and acceptance status. `docs/plan/` holds the phase-by-phase build order, phases
-01–12. **Do not skip ahead.** Each phase depends on the schema and primitives of the ones before it.
+build notes and acceptance status. `docs/plan/` holds the build order: phases 01–20 plus 02b, run in
+the order given by the index in `docs/plan/README.md`, not by number. **Do not skip ahead.** Each
+phase depends on the schema and primitives of the ones before it.
 
-Next is `docs/plan/phase-03-instrument-engine.md`. Phase 05 is the first sellable point. Phases
-01–05 are the capstone's minimum evaluation target.
+Next is `docs/plan/phase-02b-view-kit.md`, the Odoo-style shell every later screen is built from.
+Phase 05 is the first sellable point. Phases 01–05 are the capstone's minimum evaluation target.
 
 Tenant queries run inside `withRls` (`lib/db`), which switches to Supabase's `authenticated` role
 with the user's claims so RLS applies. Drizzle's owner connection bypasses RLS. RLS tests run
 against a real Postgres: `pnpm db:test:start`, export the URL it prints as `TEST_DATABASE_URL`, then
 `pnpm test`.
 
-Two ordering constraints are expensive to get wrong and are called out where they bite:
-`engagement.type` ships with `engagement` in phase 02, and `elicitation_source` (phase 06) ships
-before processes carry real data in phase 09.
+Four ordering constraints are expensive to get wrong and are called out where they bite:
+`engagement.type` ships with `engagement` in phase 02; `instrument.kind` (full enum) and `wave` ship
+in phase 03; `elicitation_source` (phase 06) ships before processes carry real data in phase 09; and
+`org_unit` and `person` (phase 07) ship before impacts and every OCM plan table.
+
+`Change Management Resources/` is third-party reference material (OCM Solution's templates). It is
+git-ignored. Never commit it, seed from it, or copy its wording into the product; Trestle takes the
+functions and writes its own content.
 
 ## Documents
 
@@ -53,6 +64,9 @@ before processes carry real data in phase 09.
 | `docs/REQUIREMENTS-MODULE.md` | Fit-gap disposition, the pattern library, ERP quality checks, and which BA techniques become tools |
 | `docs/POSITIONING.md` | How wide the product's scope is, the engagement-type model, and the digital-transformation literature base |
 | `docs/BUSINESS-MODEL.md` | The value metric, the tier structure, what may never be gated, and the entitlement layer to build now |
+| `docs/ODOO-VERTICAL.md` | Aiming the product at Odoo partners without forking it: hosting constraints, the disposition ladder, the upgrade tax, market size |
+| `docs/DASHBOARD.md` | The engagement command centre, computed milestone gates, the change roadmap, the validated chart palette |
+| `docs/OCM-MODULE.md` | The OCM lifecycle apps taken from OCM Solution's portal, their data flow, and the Odoo-style UI (apps, views, statusbar, chatter) |
 | `docs/ARCHITECTURE.md` | Stack, app structure, auth, tenancy, the decisions already made |
 | `docs/DATA-MODEL.md` | Every table, every RLS policy, the instrument engine, the anonymity mechanism |
 | `docs/plan/README.md` | Phase index and how to run a phase |
@@ -140,6 +154,19 @@ front of a CFO.
 - Typography: one sans face (Inter or system stack), two weights, three sizes. That's enough.
 
 If a screen looks like an AI generated it, it's wrong. Boring and legible beats impressive.
+
+### Screens are Odoo-shaped
+
+Records are managed the way Odoo manages them (`docs/OCM-MODULE.md` §7): apps with a navbar and an
+engagement switcher; a control panel with breadcrumbs, **New**, search facets, filters, group-by,
+favorites, a view switcher and a pager; list, kanban, calendar and timeline views; forms with header
+buttons, a **statusbar**, smart buttons, a sheet with tabs, inline child lists, and chatter.
+
+- Build screens from `components/views/` and a model config in `lib/views/`. A bespoke screen needs
+  a reason the kit cannot express.
+- Odoo's structure, this file's skin. No coloured tags, no icons on smart buttons, no purple chrome.
+  Lifecycle states render as a text statusbar, never as coloured pills.
+- View state lives in the URL, so every list, filter and grouping is linkable.
 
 ## Definition of done (per phase)
 

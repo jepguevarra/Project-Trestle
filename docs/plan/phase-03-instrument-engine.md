@@ -14,17 +14,22 @@ preview it exactly as a respondent will see it.
 
 ## Work
 
-1. Schema and RLS for all six tables.
+1. Schema and RLS for all six tables. `instrument.kind` ships with its **full enum** and
+   `instrument.wave` / `wave_label` ship now (`DATA-MODEL.md` §2, §14 constraint 3), even though only
+   `readiness` gets a template in this phase.
 2. Ship the **default readiness instrument** as a system template (`org_id` null, `is_system` true),
    with the six dimensions from `PRD.md` and items derived from the sources in `RESEARCH.md` §2. Adapt
    from the published scales; do not invent items.
 3. Ship one template per `engagement_type` (`POSITIONING.md` §4.2). Same dimensions, different item
    wording. Content work, not code.
-4. Instrument list per engagement; create from template or blank.
+4. The **Readiness** app on the view kit (phase 02b): instrument list and kanban by status; create
+   from template or blank; the instrument form has a statusbar (Draft → Open → Closed) and smart
+   buttons for questions and respondents. The builder in step 5 is the one bespoke screen, because
+   the kit cannot express drag-ordered nested sections.
 5. Instrument builder: reorder sections and questions, edit text and help text, set question type,
    weight, required, reverse-scored, and the dimension a question scores into.
 6. Dimension editor: name, weight, order.
-7. Per-instrument settings: name, kind, anonymity, opens at, closes at.
+7. Per-instrument settings: name, kind, wave and wave label, anonymity, opens at, closes at.
 8. Respondent preview — the real respondent component, rendered with no token.
 9. Validation: a `likert_*` or choice question must have a dimension; a choice question must have at
    least two options; an instrument cannot open with zero questions.
@@ -45,5 +50,7 @@ preview it exactly as a respondent will see it.
 
 ## Out of scope
 
-Respondents, tokens, sending, any score. The sponsor scorecard and pulse instruments — the `kind`
-enum carries them, this phase builds only `readiness`.
+Respondents, tokens, sending, any score. Templates for the other kinds: sponsor and pulse later,
+champion, coaching, communication feedback and training feedback with phases 16–17, go-live and
+post-go-live adoption with phase 18. The `kind` enum carries them all now; this phase builds only
+`readiness`.
