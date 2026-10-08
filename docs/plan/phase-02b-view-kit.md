@@ -73,3 +73,55 @@ its essentials in place, and reading the history of every change in chatter.
 Tasks and "Schedule task" (14). Calendar, timeline and graph views (built when the first model needs
 them: 14 for timeline, 16 for calendar, 13 for graph). Saved views / Favorites (13). Attachments in
 chatter.
+
+## Build notes
+
+Where the build departed from the plan or the docs, and why.
+
+1. **Chatter is visible exactly when its record is.** `DATA-MODEL.md` §16 said the policy would
+   check only `org_id` and `engagement_id` and never look at `res_type`. That lets a viewer read the
+   notes on every client in the org (a client's messages have no `engagement_id`), though RLS hides
+   the clients themselves. The read policy now checks that the parent record is visible, by running
+   an `EXISTS` on the parent table under its own RLS, per `res_type`. A test fails if the original
+   policy is restored. §16 updated.
+2. **Who may write chatter = who may edit the record**, enforced in RLS by
+   `private.can_write_record_message`. Clients: admins. Engagements: admins, or consultants with edit
+   access while active. Viewers write nothing. Messages are append-only (no UPDATE or DELETE grant),
+   `system` messages cannot be inserted through the API, and the author must be the caller.
+3. **`res_type` is checked twice**: Zod in `lib/views/registry.ts` and a database `CHECK` constraint
+   with the same list. A new model with chatter changes both in the same commit.
+4. **Tracking is a helper, not wrapper magic.** The doc had `engagementAction` and `orgAction` diff
+   tracked fields themselves; the wrappers do not know which row a handler writes. Writes go through
+   `updateEngagementTracked` / `updateClientTracked` (`lib/db/mutations`), which read the row, update,
+   diff the model's declared tracked fields (`lib/views/<model>.ts`) and insert one tracking message,
+   all inside the action's transaction.
+5. **Kanban drag calls the statusbar's own action** (`setEngagementStage`), as the doc requires. Each
+   movable card also has a "Move to" select, because HTML drag and drop does not exist on phones or
+   for keyboard users.
+6. **Routes are explicit for now**: `/engagements/[id]` (home menu), `/overview` (the engagement
+   form) and `/settings` (team). The generic `[app]` route in `ARCHITECTURE.md` arrives with the first
+   phase that adds an app. Settings is the "Settings" tile; the form's Team tab links to it.
+7. **The gear menu is not built.** Its items (import, export, archive) belong to later phases; the
+   list's selection already offers Archive and Re-activate.
+8. **Disabled tiles for unbuilt apps** reverse phase 02's "absent, not disabled" rule, as this phase
+   asks. Each tile names the phase that delivers it (`lib/views/apps.ts`).
+9. **Found while building:** the org navbar overflowed by 2px at 375px once it had four links (a
+   phase 02 regression), and the list lost its confirmation message when an action emptied it. Both
+   fixed and covered by e2e tests.
+
+## Acceptance status
+
+| Criterion | Status |
+|---|---|
+| `pnpm build`, `pnpm lint`, `pnpm typecheck` pass clean | Verified |
+| Engagements list: search facets, a filter, group-by client with counts, pagination; all survive reload and back (URL state) | Verified: e2e |
+| Kanban by stage; dragging a card changes `ocm_stage` and writes a tracking message | Verified: e2e (database checked) |
+| Editing a field writes exactly one tracking message naming field, old and new value | Verified: e2e (database checked) and unit tests for the diff |
+| A viewer sees the form read-only, cannot drag cards, and a crafted call is rejected | Verified: e2e (no inputs, cards not draggable); a crafted write is refused by `engagementAction` and by RLS (RLS suite) |
+| An archived engagement is read-only in the form and the kanban for non-admins | Verified: e2e |
+| The engagement switcher lists only engagements the user can access | Verified: e2e |
+| Deleting a client deletes its chatter (trigger), proven by a test | Verified: RLS suite |
+| `record_message` cross-org RLS test; a consultant cannot read messages on an unassigned engagement | Verified: RLS suite, plus the viewer-and-client case, forging, and append-only |
+| `res_type` values outside the registry are rejected by Zod | Verified: unit test (and by the database `CHECK`, RLS suite) |
+| Usable at 375px: search and menus behind one button; forms stack | Verified: e2e, including no horizontal scroll |
+| No bespoke client/engagement table or form components remain | Done: `engagement-table`, `create-engagement-form`, `engagement-details-form` and `client-form` deleted; the dashboard uses the list view |

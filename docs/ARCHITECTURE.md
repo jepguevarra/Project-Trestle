@@ -56,7 +56,10 @@ app/
       page.tsx                 org dashboard
       clients/
       engagements/[id]/        home menu: the engagement's apps (OCM-MODULE.md §7.1)
+        overview/              the engagement form (phase 02b)
+        settings/              the engagement's team (phase 02b)
         [app]/                 collection view: list | kanban | calendar | timeline | graph
+                               (arrives with the first phase that adds an app)
           [recordId]/          form view with statusbar, smart buttons, chatter
           new/
                                apps: overview, checklist, audiences, stakeholders, impacts,

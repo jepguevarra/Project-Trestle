@@ -24,7 +24,7 @@ docs cite; the OCM lifecycle (`OCM-MODULE.md`, October 2026) added 02b and 13–
 |---|---|---|---|---|
 | 1 | 01 | Foundations ✓ | Next.js + Supabase + Drizzle, auth, orgs, membership, the RLS test harness, seed | — |
 | 2 | 02 | Clients and engagements ✓ | Client and engagement records with `type`, assignment, the app shell | 01 |
-| 3 | **02b** | **View kit and Project Essentials** | The Odoo-style shell: apps, control panel, list/kanban/form, statusbar, smart buttons, chatter; engagement stage and essentials | 02 |
+| 3 | **02b** | **View kit and Project Essentials** ✓ | The Odoo-style shell: apps, control panel, list/kanban/form, statusbar, smart buttons, chatter; engagement stage and essentials | 02 |
 | 4 | 03 | Instrument engine | Instruments, dimensions, sections, questions, templates; full `kind` enum and `wave` | 02b |
 | 5 | 04 | Distribution and response | Respondents, signed tokens, the public survey page, nudges | 03 |
 | 6 | 05 | Scoring and report | Scoring functions, dashboard, consensus, perception gap, alpha, export | 04 |

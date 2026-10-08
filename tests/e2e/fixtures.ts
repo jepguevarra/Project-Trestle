@@ -54,28 +54,48 @@ export function assign(engagementId: string, email: string, access: "edit" | "re
   );
 }
 
-/** Creates a client through the UI and returns to wherever the create form redirects. */
+/** Creates a client through the New form; returns its id from the URL it lands on. */
 export async function createClient(page: Page, slug: string, name: string) {
-  await page.goto(`/${slug}/clients`);
+  await page.goto(`/${slug}/clients/new`);
   await page.getByLabel("Name").fill(name);
   await page.getByLabel("Industry").selectOption("Manufacturing");
   await page.getByLabel("Size").selectOption("small");
-  await page.getByRole("button", { name: "Add client" }).click();
-  await expect(page.getByRole("heading", { level: 1, name })).toBeVisible();
+  await page.getByRole("button", { name: "Save" }).click();
+  await expect(page).toHaveURL(new RegExp(`/${slug}/clients/[0-9a-f-]{36}$`));
+  return page.url().split("/").at(-1)!;
 }
 
-/** Creates an engagement through the UI; returns its id from the URL it lands on. */
+/** Creates an engagement through the New form; returns its id from the URL it lands on. */
 export async function createEngagement(
   page: Page,
   slug: string,
   e: { client: string; name: string; type: string; system: string },
 ) {
-  await page.goto(`/${slug}/engagements`);
-  await page.getByLabel("Client").selectOption({ label: e.client });
+  await page.goto(`/${slug}/engagements/new`);
   await page.getByLabel("Engagement name").fill(e.name);
+  await page.getByLabel("Client").selectOption({ label: e.client });
   await page.getByLabel("Type of change").selectOption(e.type);
   await page.getByLabel("Target system").fill(e.system);
-  await page.getByRole("button", { name: "Create engagement" }).click();
-  await expect(page.getByRole("heading", { level: 1, name: e.name })).toBeVisible();
-  return page.url().split("/").at(-1)!;
+  await page.getByRole("button", { name: "Save" }).click();
+  await expect(page).toHaveURL(/\/engagements\/[0-9a-f-]{36}\/overview$/);
+  return page.url().split("/").at(-2)!;
+}
+
+/** Inserts engagements straight into the database (for paging and grouping tests). */
+export function insertEngagements(slug: string, clientName: string, names: string[]) {
+  return withDb(async (sql) => {
+    const [c] = await sql<{ id: string; org_id: string }[]>`
+      insert into client (org_id, name) select o.id, ${clientName} from organization o where o.slug = ${slug}
+      returning id, org_id`;
+    for (const name of names) {
+      await sql`insert into engagement (org_id, client_id, name, type, target_system)
+                values (${c!.org_id}, ${c!.id}, ${name}, 'automation', 'n8n')`;
+    }
+    return c!.id;
+  });
+}
+
+export function trackingMessages(engagementId: string) {
+  return withDb((sql) => sql<{ tracking: { field: string; label: string; old: string | null; new: string | null }[] }[]>`
+    select tracking from record_message where res_id = ${engagementId} and kind = 'tracking' order by created_at`);
 }

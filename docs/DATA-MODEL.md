@@ -809,8 +809,12 @@ stands. The Odoo-style chatter (`OCM-MODULE.md` §7.6) needs a message log on ev
 narrow table per model would be thirty identical tables. The reasons against polymorphism in §9 do
 not apply here:
 
-- **RLS** stays a single indexed predicate, because `org_id` and `engagement_id` are denormalised
-  onto the row like everywhere else. The policy never looks at `res_type`.
+- **RLS** reads as "a message is visible exactly when its record is": the org predicate plus an
+  `EXISTS` on the parent table (chosen by `res_type`), which runs under the parent's own RLS. *As
+  built (phase 02b):* the first sketch here checked only `org_id`/`engagement_id`, which let a viewer
+  read notes on every client in the org. Writes need `private.can_write_record_message`: whoever may
+  edit the record, with `org_id`/`engagement_id` matching it and the caller as author. Messages are
+  append-only, and `system` messages cannot be inserted through the API.
 - **Integrity** matters less: a message is a display log, not evidence. Nothing is computed from it
   and no report traces through it.
 - **Orphans** are prevented by one generic `after delete` trigger, `private.delete_record_messages()`,
@@ -830,4 +834,6 @@ the same transaction as the write. `task.res_type/res_id` (§15.1) follows the s
 same trigger: it is how "Schedule task" in chatter links a task to its record.
 
 Allowed `res_type` values are a closed list in `lib/views/registry.ts`, validated by Zod on every
-write. A polymorphic column that accepts any string is how this pattern goes wrong.
+write and mirrored by a `CHECK` constraint. A polymorphic column that accepts any string is how this
+pattern goes wrong. Adding a model with chatter means: the registry, the `CHECK`, the `CASE` in the
+read policy and in `can_write_record_message`, and the delete trigger on the model's table.

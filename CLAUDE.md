@@ -31,12 +31,13 @@ resourcing or sprints. Every feature must be defensible as "a consultant would b
 
 ## Current state
 
-Phases 01 (foundations) and 02 (clients and engagements) are built. Each phase file ends with its
+Phases 01 (foundations), 02 (clients and engagements) and 02b (view kit) are built. Each phase file ends with its
 build notes and acceptance status. `docs/plan/` holds the build order: phases 01–20 plus 02b, run in
 the order given by the index in `docs/plan/README.md`, not by number. **Do not skip ahead.** Each
 phase depends on the schema and primitives of the ones before it.
 
-Next is `docs/plan/phase-02b-view-kit.md`, the Odoo-style shell every later screen is built from.
+Next is `docs/plan/phase-03-instrument-engine.md`. Build its screens from the view kit
+(`components/views/`, `lib/views/`); `phase-02b-view-kit.md`'s build notes say how a model plugs in.
 Phase 05 is the first sellable point. Phases 01–05 are the capstone's minimum evaluation target.
 
 Tenant queries run inside `withRls` (`lib/db`), which switches to Supabase's `authenticated` role
