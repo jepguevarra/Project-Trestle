@@ -18,6 +18,7 @@ export function Statusbar({
   canMove,
   action,
   incomplete,
+  notes,
 }: {
   steps: StageDef[];
   current: string;
@@ -25,6 +26,8 @@ export function Statusbar({
   action: (prev: ActionState, formData: FormData) => Promise<ActionState>;
   /** What is incomplete before leaving the current stage. Filled by later phases (14, 13). */
   incomplete: string[];
+  /** What moving to a stage means, keyed by its value; replaces the generic text when present. */
+  notes?: Record<string, string>;
 }) {
   const dialog = useRef<HTMLDialogElement>(null);
   const [target, setTarget] = useState<StageDef | null>(null);
@@ -78,7 +81,10 @@ export function Statusbar({
                 ))}
               </ul>
             </div>
-          ) : (
+          ) : null}
+          {target && notes?.[target.value] ? (
+            <p className="text-sm text-muted-foreground">{notes[target.value]}</p>
+          ) : incomplete.length ? null : (
             <p className="text-sm text-muted-foreground">
               Nothing is tracked as incomplete yet. Checklist tasks and milestone gates will be listed here once those
               modules exist. You can move back at any time.

@@ -29,8 +29,8 @@ export default async function BuilderPage({ params }: { params: Promise<{ orgSlu
   const base = `/${org.slug}/engagements/${engagement.id}/readiness`;
   const bind = <A extends unknown[], R>(fn: (orgSlug: string, id: string, ...rest: A) => R) => fn.bind(null, org.slug, engagement.id);
 
-  // The builder keeps local state for optimistic reordering; a new key after any server change
-  // remounts it with what the database now holds.
+  // The builder keeps local state for optimistic reordering; a new version after any server change
+  // tells it to adopt what the database now holds.
   const version = createHash("sha1")
     .update(
       JSON.stringify([
@@ -70,8 +70,8 @@ export default async function BuilderPage({ params }: { params: Promise<{ orgSlu
         </p>
       )}
       <InstrumentBuilder
-        key={version}
         instrumentId={inst.id}
+        version={version}
         editable={editable}
         dimensions={tree.dimensions.map((d) => ({ id: d.id, name: d.name, weight: d.weight }))}
         sections={tree.sections.map((s) => ({

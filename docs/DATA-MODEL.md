@@ -81,28 +81,53 @@ instrument_template     reusable definition, not tied to an engagement
 instrument              a live run inside one engagement
   id, org_id, engagement_id, template_id (nullable), name, kind,
   wave (smallint, default 1), wave_label,
-  anonymity, opens_at, closes_at, status, token_secret, created_by
+  anonymity, opens_at, closes_at, status, created_by
   kind:      readiness | sponsor | pulse | go_live_adoption | post_go_live_adoption
            | training_feedback | champion | coaching | communication_feedback | custom
   anonymity: identified | anonymous
   status:    draft | open | closed
-  token_secret: random bytes — rotating it revokes every outstanding link
+  unique (id, engagement_id, org_id)   -- target of the children's composite FKs
+
+-- Every child carries org_id AND engagement_id, with a composite FK
+-- (instrument_id, engagement_id, org_id) → instrument, so each policy is the plain
+-- engagement-scope predicate with no join.
 
 dimension               what a question scores into
-  id, org_id, instrument_id, name, weight (numeric), sort_order
+  id, org_id, engagement_id, instrument_id, name, weight (numeric), sort_order
   unique (instrument_id, name)
 
 section
-  id, org_id, instrument_id, title, description, sort_order
+  id, org_id, engagement_id, instrument_id, title, description, sort_order
 
 question
-  id, org_id, instrument_id, section_id, dimension_id (nullable for open text),
-  text, help_text, type, weight, is_required, is_reverse_scored, sort_order
+  id, org_id, engagement_id, instrument_id, section_id, dimension_id (null only for
+  open_text and numeric, by CHECK), text, help_text, type, weight, is_required,
+  is_reverse_scored, source, sort_order
   type: likert_5 | likert_7 | single_choice | multi_choice | open_text | numeric
+  source: the construct and reference the item operationalises; consultant-facing only
+  FK (dimension_id, instrument_id) → dimension ON DELETE RESTRICT
 
 question_option         for choice types
-  id, org_id, question_id, label, value (numeric), sort_order
+  id, org_id, engagement_id, instrument_id, question_id, label, value (numeric), sort_order
 ```
+
+**No `token_secret` on `instrument`** (changed in phase 03). Everything on `instrument` is readable
+by everyone on the engagement, a client-side viewer included, so the link-signing secret cannot live
+here. Phase 04 stores it where only the service-role route handler can read it.
+
+**Status rules, enforced by a trigger** (`private.guard_instrument`): draft → open needs at least
+one question (TR422); open ↔ closed is allowed; nothing goes back to draft, and draft cannot jump to
+closed (TR423); `anonymity` is fixed once an instrument has left draft (TR424), because respondents
+were told how their answers would be used; an instrument never moves to another engagement or org.
+Dimensions, sections, questions and options are writable only while the instrument is a draft
+(`private.can_edit_instrument_content`), so an opened instrument's questions are frozen. To change
+questions after opening, create a new wave.
+
+Shipped templates (`is_system`, `org_id` null) are inserted by `pnpm db:migrate`
+(`lib/db/system-templates.ts`) at the current `TEMPLATE_VERSION`; an existing version is never
+edited. An instrument copies its template's definition when created, so later template versions
+never change it. The item wording is in `lib/instruments/readiness-templates.ts` and is generated
+for review into `docs/READINESS-INSTRUMENT.md`.
 
 `dimension.weight` and `question.weight` are both `numeric` and both default to 1. Scoring normalises;
 weights never have to sum to anything.
@@ -570,8 +595,9 @@ The only place the service role appears. `app/api/public/survey/[token]/route.ts
    `respondent.completed_at`, and null `respondent_id` on those responses when the instrument is
    anonymous.
 
-Tokens are single-instrument and expire at the instrument's close date. Rotating
-`instrument.token_secret` revokes every outstanding link at once.
+Tokens are single-instrument and expire at the instrument's close date. Rotating the instrument's
+token secret revokes every outstanding link at once. The secret is not a column on `instrument`
+(§2): phase 04 keeps it where only the service-role handler can read it.
 
 ### The test that must never be skipped
 

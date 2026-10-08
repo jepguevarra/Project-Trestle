@@ -191,6 +191,7 @@ function QuestionField({
     <fieldset id={id} className="grid gap-2" data-question-type={q.type} aria-invalid={missing || undefined}>
       <legend className="mb-2 text-sm font-semibold">{label}</legend>
       {help}
+      {multi ? <p className="text-sm text-muted-foreground">Choose all that apply.</p> : null}
       <div
         className={cn(
           "grid gap-1.5",

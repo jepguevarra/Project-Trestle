@@ -96,6 +96,13 @@ export default async function InstrumentPage({
           canMove={canEdit}
           action={moveInstrument.bind(null, engagement.id, org.slug, inst.id)}
           incomplete={isDraft && row.questions === 0 ? ["Add at least one question."] : []}
+          notes={{
+            open: isDraft
+              ? "Once it opens, its questions and anonymity are fixed and it cannot go back to draft."
+              : "Reopening lets people respond again.",
+            closed: "Closing stops new responses. You can reopen it later.",
+            draft: "An assessment that has opened cannot go back to draft. Create a new wave instead.",
+          }}
         />
       }
       smartButtons={
@@ -169,7 +176,7 @@ export default async function InstrumentPage({
                     section: q.sectionTitle,
                     type: QUESTION_TYPE_LABELS[q.type],
                     dimension: q.dimensionId ? (dimensionName.get(q.dimensionId) ?? "") : "Not scored",
-                    weight: q.weight,
+                    weight: q.dimensionId ? q.weight : "",
                   },
                 }))}
                 emptyText="No questions yet."

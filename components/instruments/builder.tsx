@@ -43,12 +43,15 @@ const err = (errors: Errors | undefined, key: string) =>
  */
 export function InstrumentBuilder({
   instrumentId,
+  version,
   editable,
   dimensions: initialDimensions,
   sections: initialSections,
   actions,
 }: {
   instrumentId: string;
+  /** Changes whenever the server's copy changes; local state is then replaced with it. */
+  version: string;
   editable: boolean;
   dimensions: BuilderDimension[];
   sections: BuilderSection[];
@@ -59,6 +62,15 @@ export function InstrumentBuilder({
   const [message, setMessage] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
   const [drag, setDrag] = useState<string | null>(null);
+
+  // Adopt the server's copy after any write (React's "adjust state while rendering" pattern), without
+  // remounting: an editor the user has open stays open.
+  const [seen, setSeen] = useState(version);
+  if (version !== seen) {
+    setSeen(version);
+    setDims(initialDimensions);
+    setSecs(initialSections);
+  }
 
   /** Calls an action with the instrument id and the given fields; reports a refusal at the top. */
   const call = async (action: Act, fields: Record<string, string>) => {
@@ -199,7 +211,7 @@ export function InstrumentBuilder({
                   onDragEnd={() => setDrag(null)}
                   onDragOver={(e) => (drag ? e.preventDefault() : undefined)}
                   onDrop={(e) => onDrop(e, s.id, q.id)}
-                  className={cn("border-t border-border py-3", drag === q.id && "opacity-50", editable && "cursor-grab")}
+                  className={cn("border-t border-border py-3", drag === q.id && "opacity-50", editable && "cursor-grab select-none")}
                 >
                   <QuestionRow
                     question={q}

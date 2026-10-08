@@ -28,14 +28,16 @@ their size suggests.
 7. **The anonymity transaction**: on final submit, write responses with segment attributes, set
    `completed_at`, and null `respondent_id` on those rows when the instrument is `anonymous`.
 8. Completion tracking and a nudge action that emails only non-responders.
-9. Close an instrument; rotate `token_secret` to revoke outstanding links.
+9. Close an instrument; rotate its token secret to revoke outstanding links. Phase 03 left
+   `token_secret` off `instrument`, which every engagement member can read: store it where only the
+   service-role route handler can (`DATA-MODEL.md` §2).
 
 ## Acceptance criteria
 
 - [ ] `pnpm build`, `pnpm lint`, `pnpm typecheck` pass clean
 - [ ] A respondent opens their link with no account, answers, leaves mid-way, returns and resumes
 - [ ] A tampered, expired or wrong-instrument token is rejected with a plain message, not a stack trace
-- [ ] Rotating `token_secret` invalidates every previously sent link
+- [ ] Rotating the token secret invalidates every previously sent link
 - [ ] **On an anonymous instrument, no row in `response` has a non-null `respondent_id` after submit**,
       verified by a direct database query in a test
 - [ ] On an anonymous instrument, `respondent.completed_at` is still set and nudges still work
