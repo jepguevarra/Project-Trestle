@@ -11,3 +11,10 @@ export const SURVEY_MESSAGES = {
 } as const;
 
 export type SurveyMessageKey = keyof typeof SURVEY_MESSAGES;
+
+/** The anonymity notice respondents see, in the live survey and in the preview alike. */
+export function anonymityNotice(anonymous: boolean) {
+  return anonymous
+    ? "Your answers are anonymous: once you submit, they are stored without your name or email, and results are only shown for groups of five or more people."
+    : "Your answers are linked to your name, so the team can follow up with you.";
+}

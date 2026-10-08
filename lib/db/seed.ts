@@ -17,6 +17,7 @@ import {
   membership,
   organization,
   recordMessage,
+  respondent,
 } from "./schema";
 import { syncSystemTemplates } from "./system-templates";
 import * as schema from "./schema";
@@ -206,6 +207,37 @@ async function main() {
         definitionSchema.parse(template.definition),
       ),
     );
+  }
+
+  // People to ask (phase 04): the Odoo rollout's assessment is a draft, so nobody is emailed until a
+  // consultant opens it. Addresses are on a reserved test domain.
+  const [seededInstrument] = await db.select({ id: instrument.id }).from(instrument).where(eq(instrument.engagementId, odoo.id)).limit(1);
+  if (seededInstrument) {
+    const people = [
+      ["Grace Okafor", "Finance", "AP clerk", "frontline"],
+      ["Tom Reyes", "Finance", "Finance manager", "manager"],
+      ["Priya Nair", "Finance", "Accountant", "frontline"],
+      ["Sam Whitfield", "Warehouse", "Stores lead", "supervisor"],
+      ["Lena Fischer", "Warehouse", "Picker", "frontline"],
+      ["Marco Bianchi", "Warehouse", "Picker", "frontline"],
+      ["Ade Bello", "Sales", "Sales coordinator", "frontline"],
+      ["Ruth Kaplan", "Operations", "Operations director", "executive"],
+    ] as const;
+    await db
+      .insert(respondent)
+      .values(
+        people.map(([name, department, roleTitle, seniority]) => ({
+          orgId: acme.id,
+          engagementId: odoo.id,
+          instrumentId: seededInstrument.id,
+          name,
+          email: `${name.split(" ")[0]!.toLowerCase()}@harbourfoods.test`,
+          department,
+          roleTitle,
+          seniority,
+        })),
+      )
+      .onConflictDoNothing();
   }
 
   // A pending invitation, so the members page and the accept flow have something to show. The

@@ -29,27 +29,43 @@ const LIKERT: Record<"likert_5" | "likert_7", string[]> = {
 
 const answered = (v: Answers[string] | undefined) => (Array.isArray(v) ? v.length > 0 : v !== undefined && v.trim() !== "");
 
+/** The first page holding a required question without an answer: where a returning respondent resumes. */
+function resumePage(pages: RespondentSection[], answers: Answers) {
+  const at = pages.findIndex((s) => s.questions.some((q) => q.required && !answered(answers[q.id])));
+  return at < 0 ? Math.max(pages.length - 1, 0) : at;
+}
+
 /**
  * The survey as a respondent sees it, one section per page. The same component renders the
- * consultant's preview (`mode="preview"`: nothing is sent) and, from phase 04, the live survey.
+ * consultant's preview (`mode="preview"`: nothing is sent) and the live survey, where each page is
+ * saved as the respondent moves on, so they can leave and come back. Save and submit return an
+ * error sentence, or null on success.
  */
 export function RespondentForm({
   title,
   intro,
   sections,
   mode,
+  initialAnswers,
+  onChange,
+  onSave,
   onSubmit,
 }: {
   title: string;
   intro?: string;
   sections: RespondentSection[];
   mode: "preview" | "live";
-  onSubmit?: (answers: Answers) => Promise<void>;
+  initialAnswers?: Answers;
+  onChange?: (answers: Answers) => void;
+  onSave?: (answers: Answers) => Promise<string | null>;
+  onSubmit?: (answers: Answers) => Promise<string | null>;
 }) {
   const pages = sections.filter((s) => s.questions.length > 0);
-  const [page, setPage] = useState(0);
-  const [answers, setAnswers] = useState<Answers>({});
+  const [answers, setAnswers] = useState<Answers>(initialAnswers ?? {});
+  const [page, setPage] = useState(() => (initialAnswers && Object.keys(initialAnswers).length ? resumePage(pages, initialAnswers) : 0));
   const [missing, setMissing] = useState<string[]>([]);
+  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
   const [done, setDone] = useState(false);
 
   if (!pages.length) return <p className="text-sm text-muted-foreground">There are no questions to show yet.</p>;
@@ -58,7 +74,7 @@ export function RespondentForm({
       <div role="status" className="grid gap-2">
         <h1 className="text-xl font-semibold">Thank you</h1>
         <p className="text-sm text-muted-foreground">
-          {mode === "preview" ? "Preview only: nothing was saved." : "Your answers have been recorded."}
+          {mode === "preview" ? "Preview only: nothing was saved." : "Your answers have been recorded. You can close this page."}
         </p>
         {mode === "preview" ? (
           <div>
@@ -74,8 +90,24 @@ export function RespondentForm({
   const section = pages[page]!;
   const last = page === pages.length - 1;
   const set = (id: string, v: string | string[]) => {
-    setAnswers((a) => ({ ...a, [id]: v }));
+    const nextAnswers = { ...answers, [id]: v };
+    setAnswers(nextAnswers);
+    onChange?.(nextAnswers);
     setMissing((m) => m.filter((x) => x !== id));
+  };
+  // This page's answers, with unanswered questions sent empty so a cleared answer is cleared.
+  const pageAnswers = () => Object.fromEntries(section.questions.map((q) => [q.id, answers[q.id] ?? ""]));
+
+  const go = async (to: number) => {
+    setError(null);
+    if (onSave) {
+      setBusy(true);
+      const err = await onSave(pageAnswers());
+      setBusy(false);
+      if (err) return setError(err);
+    }
+    setPage(to);
+    window.scrollTo({ top: 0 });
   };
 
   const next = async () => {
@@ -85,12 +117,14 @@ export function RespondentForm({
       document.getElementById(`q-${gaps[0]}`)?.scrollIntoView({ block: "center" });
       return;
     }
-    if (!last) {
-      setPage(page + 1);
-      window.scrollTo({ top: 0 });
-      return;
+    if (!last) return go(page + 1);
+    setError(null);
+    if (onSubmit) {
+      setBusy(true);
+      const err = await onSubmit(pageAnswers());
+      setBusy(false);
+      if (err) return setError(err);
     }
-    if (onSubmit) await onSubmit(answers);
     setDone(true);
   };
 
@@ -116,20 +150,28 @@ export function RespondentForm({
         ))}
       </section>
 
-      <div className="flex flex-wrap items-center gap-2 border-t border-border pt-4">
-        {page > 0 ? (
-          <Button type="button" variant="outline" onClick={() => setPage(page - 1)}>
-            Back
+      <div className="grid gap-2 border-t border-border pt-4">
+        <div className="flex gap-2">
+          {page > 0 ? (
+            <Button type="button" variant="outline" className="h-11 flex-1 sm:flex-none" disabled={busy} onClick={() => go(page - 1)}>
+              Back
+            </Button>
+          ) : null}
+          <Button type="button" className="h-11 flex-1 sm:flex-none" disabled={busy} onClick={next}>
+            {busy ? "Saving…" : last ? "Submit" : "Next"}
           </Button>
-        ) : null}
-        <Button type="button" onClick={next}>
-          {last ? "Submit" : "Next"}
-        </Button>
+        </div>
         {missing.length ? (
           <p role="alert" className="text-sm text-destructive">
             {missing.length === 1 ? "One required question is unanswered." : `${missing.length} required questions are unanswered.`}
           </p>
         ) : null}
+        {error ? (
+          <p role="alert" className="text-sm text-destructive">
+            {error}
+          </p>
+        ) : null}
+        {mode === "live" && !last ? <p className="text-sm text-muted-foreground">Your answers are saved each time you move on. You can leave and come back with the same link.</p> : null}
       </div>
     </div>
   );
@@ -204,7 +246,7 @@ function QuestionField({
             <label
               key={c.id}
               className={cn(
-                "flex cursor-pointer items-center gap-2 rounded-md border border-border px-3 py-2 text-sm",
+                "flex min-h-11 cursor-pointer items-center gap-3 rounded-md border border-border px-3 py-2 text-sm",
                 isLikert && "sm:flex-col sm:justify-start sm:px-2 sm:text-center",
                 checked && "border-primary",
               )}

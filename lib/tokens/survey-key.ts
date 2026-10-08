@@ -1,8 +1,8 @@
 import "server-only";
-import { createHash } from "node:crypto";
 import { env } from "@/lib/env";
+import { deriveSurveyKey } from "./survey";
 
 /** The survey link signing key. Server-only; see SURVEY_TOKEN_SECRET in lib/validation/env.ts. */
 export function surveyTokenKey(): string {
-  return env.SURVEY_TOKEN_SECRET ?? createHash("sha256").update(`trestle-survey-token:${env.DATABASE_URL}`).digest("base64url");
+  return deriveSurveyKey(env.SURVEY_TOKEN_SECRET, env.DATABASE_URL);
 }

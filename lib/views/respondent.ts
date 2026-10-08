@@ -1,3 +1,4 @@
+import type { FieldDef } from "@/components/views/record-form";
 import type { ModelDef } from "./types";
 
 export const SENIORITIES = ["frontline", "supervisor", "manager", "executive"] as const;
@@ -55,3 +56,12 @@ export const respondentModel: ModelDef = {
   defaultOrder: { field: "name", dir: "asc" },
   pageSize: 80,
 };
+
+/** The respondent form's fields, shared by the add and edit pages. */
+export const RESPONDENT_FIELDS: FieldDef[] = [
+  { name: "name", label: "Name", kind: "text" },
+  { name: "email", label: "Email", kind: "text", required: true },
+  { name: "department", label: "Department", kind: "text" },
+  { name: "roleTitle", label: "Role", kind: "text" },
+  { name: "seniority", label: "Seniority", kind: "select", options: SENIORITIES.map((s) => ({ value: s, label: SENIORITY_LABELS[s] })) },
+];

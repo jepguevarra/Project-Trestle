@@ -23,5 +23,6 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)"],
+  // Survey respondents have no account: their page and API never touch Supabase Auth.
+  matcher: ["/((?!_next/static|_next/image|favicon.ico|survey/|api/public/|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)"],
 };

@@ -5,6 +5,7 @@ import { RespondentForm, type RespondentSection } from "@/components/survey/resp
 import { requireEngagementAccess } from "@/lib/auth/engagement";
 import { claimsFor } from "@/lib/auth/session";
 import { withRls } from "@/lib/db";
+import { anonymityNotice } from "@/lib/survey/messages";
 import { findInstrument, getInstrumentTree } from "@/lib/db/queries/instruments";
 
 export const metadata: Metadata = { title: "Preview" };
@@ -50,11 +51,7 @@ export default async function PreviewPage({ params }: { params: Promise<{ orgSlu
         <RespondentForm
           mode="preview"
           title={data.inst.name}
-          intro={
-            data.inst.anonymity === "anonymous"
-              ? "Your answers are anonymous. Results are only shown for groups of five or more people."
-              : "Your answers are linked to your name, so the team can follow up with you."
-          }
+          intro={anonymityNotice(data.inst.anonymity === "anonymous")}
           sections={sections}
         />
       </div>

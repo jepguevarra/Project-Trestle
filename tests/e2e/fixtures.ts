@@ -1,6 +1,7 @@
 import { expect, type Page } from "@playwright/test";
 import { config } from "dotenv";
 import postgres from "postgres";
+import { deriveSurveyKey, mintSurveyToken } from "../../lib/tokens/survey";
 
 config({ path: [".env.local", ".env"], quiet: true });
 
@@ -98,4 +99,46 @@ export function insertEngagements(slug: string, clientName: string, names: strin
 export function trackingMessages(engagementId: string) {
   return withDb((sql) => sql<{ tracking: { field: string; label: string; old: string | null; new: string | null }[] }[]>`
     select tracking from record_message where res_id = ${engagementId} and kind = 'tracking' order by created_at`);
+}
+
+/**
+ * A small instrument straight in the database: two sections, a required agreement question, a
+ * required single choice (North/South) and an optional open question. Returns its id.
+ */
+export function smallInstrument(engagementId: string, anonymity: "anonymous" | "identified" = "anonymous") {
+  return withDb(async (sql) => {
+    const [i] = await sql<{ id: string; org_id: string }[]>`
+      insert into instrument (org_id, engagement_id, name, kind, anonymity)
+      select org_id, id, 'Pulse check', 'readiness', ${anonymity} from engagement where id = ${engagementId}
+      returning id, org_id`;
+    const scope = { org: i!.org_id, inst: i!.id };
+    const [d] = await sql<{ id: string }[]>`insert into dimension (org_id, engagement_id, instrument_id, name)
+      values (${scope.org}, ${engagementId}, ${scope.inst}, 'Leadership') returning id`;
+    const [s1, s2] = await sql<{ id: string }[]>`insert into section (org_id, engagement_id, instrument_id, title, sort_order)
+      values (${scope.org}, ${engagementId}, ${scope.inst}, 'About leadership', 0), (${scope.org}, ${engagementId}, ${scope.inst}, 'About you', 1)
+      returning id`;
+    await sql`insert into question (org_id, engagement_id, instrument_id, section_id, dimension_id, text, type, sort_order)
+      values (${scope.org}, ${engagementId}, ${scope.inst}, ${s1!.id}, ${d!.id}, 'Leaders are committed to this change.', 'likert_5', 0)`;
+    const [choice] = await sql<{ id: string }[]>`insert into question (org_id, engagement_id, instrument_id, section_id, dimension_id, text, type, sort_order)
+      values (${scope.org}, ${engagementId}, ${scope.inst}, ${s2!.id}, ${d!.id}, 'Which site do you work at?', 'single_choice', 1) returning id`;
+    await sql`insert into question_option (org_id, engagement_id, instrument_id, question_id, label, value, sort_order)
+      values (${scope.org}, ${engagementId}, ${scope.inst}, ${choice!.id}, 'North', 1, 0), (${scope.org}, ${engagementId}, ${scope.inst}, ${choice!.id}, 'South', 2, 1)`;
+    await sql`insert into question (org_id, engagement_id, instrument_id, section_id, text, type, is_required, sort_order)
+      values (${scope.org}, ${engagementId}, ${scope.inst}, ${s2!.id}, 'Anything else?', 'open_text', false, 2)`;
+    return i!.id;
+  });
+}
+
+/** A respondent's link, minted exactly as the server does (same key, current versions). */
+export async function surveyLink(instrumentId: string, email: string, opts: { exp?: number; claimInstrument?: string } = {}) {
+  const row = await withDb(
+    (sql) => sql<{ r: string; v: number; e: number }[]>`
+      select r.id as r, r.token_version as v, i.token_epoch as e
+      from respondent r join instrument i on i.id = r.instrument_id
+      where r.instrument_id = ${instrumentId} and r.email = ${email.toLowerCase()}`,
+  );
+  const { r, v, e } = row[0]!;
+  const key = deriveSurveyKey(process.env.SURVEY_TOKEN_SECRET || undefined, process.env.DATABASE_URL!);
+  const token = mintSurveyToken({ r, i: opts.claimInstrument ?? instrumentId, v, e, exp: opts.exp ?? Math.floor(Date.now() / 1000) + 3600 }, key);
+  return `/survey/${token}`;
 }

@@ -1,4 +1,4 @@
-import { createHmac, timingSafeEqual } from "node:crypto";
+import { createHash, createHmac, timingSafeEqual } from "node:crypto";
 
 /**
  * Signed survey links (DATA-MODEL.md §12, the anonymous respondent path). Pure functions: the key
@@ -75,4 +75,9 @@ export function staleReason(
 export function surveyTokenExpiry(closesAt: Date | null, now: Date = new Date()): number {
   const fallback = now.getTime() + 90 * 24 * 60 * 60 * 1000;
   return Math.floor((closesAt ? Math.max(closesAt.getTime(), now.getTime()) : fallback) / 1000);
+}
+
+/** The signing key: SURVEY_TOKEN_SECRET when set, otherwise derived from the database URL (which holds its password). */
+export function deriveSurveyKey(secret: string | undefined, databaseUrl: string): string {
+  return secret ?? createHash("sha256").update(`trestle-survey-token:${databaseUrl}`).digest("base64url");
 }

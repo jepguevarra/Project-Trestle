@@ -1,5 +1,6 @@
 import { ENGAGEMENT_TYPE_LABELS, SIZE_BAND_LABELS, type EngagementType, type SizeBand } from "@/lib/validation/engagements";
 import { OCM_STAGE_LABELS, type OcmStage } from "./engagement";
+import { RESPONDENT_STATE_LABELS, respondentState, SENIORITY_LABELS, type Seniority } from "./respondent";
 import { ANONYMITY_LABELS, INSTRUMENT_KIND_LABELS, INSTRUMENT_STATUS_LABELS, type InstrumentKind, type InstrumentStatus } from "./instrument";
 import type { RowData } from "./types";
 
@@ -94,5 +95,33 @@ export function instrumentRows(rows: InstrumentRow[], base: string, context: str
     stage: r.status,
     group: groupBy === "kind" ? r.kind : groupBy === "status" ? r.status : undefined,
     canMove,
+  }));
+}
+
+type RespondentRow = {
+  id: string;
+  name: string | null;
+  email: string;
+  department: string | null;
+  roleTitle: string | null;
+  seniority: Seniority | null;
+  invitedAt: Date | null;
+  remindedAt: Date | null;
+  completedAt: Date | null;
+};
+
+export function respondentRows(rows: RespondentRow[], base: string, context: string, groupBy: string | null): RowData[] {
+  return rows.map((r) => ({
+    id: r.id,
+    href: `${base}/${r.id}${context ? `?${context}` : ""}`,
+    cells: {
+      name: r.name,
+      email: r.email,
+      department: r.department,
+      role: r.roleTitle,
+      seniority: r.seniority ? SENIORITY_LABELS[r.seniority] : null,
+      state: RESPONDENT_STATE_LABELS[respondentState(r)],
+    },
+    group: groupBy === "department" ? (r.department ?? "") : groupBy === "seniority" ? (r.seniority ?? "") : undefined,
   }));
 }

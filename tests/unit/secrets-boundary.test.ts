@@ -41,8 +41,21 @@ describe("secrets boundary", () => {
     expect(offenders).toEqual([]);
   });
 
-  it("the service role is not used anywhere yet (phase 04 introduces it in one route handler)", () => {
+  it("Supabase's service role is used nowhere: the public survey path has its own narrow role instead", () => {
     const offenders = sources.filter(({ text }) => /SERVICE_ROLE|service_role/.test(text)).map(({ path }) => path);
     expect(offenders).toEqual([]);
+  });
+
+  // Phase 04 acceptance: the code that acts for someone with no account appears in one route handler.
+  it("only the public survey route enters the survey role, and nothing else touches the owner connection", () => {
+    const route = "app/api/public/survey/[token]/route.ts";
+    const surveyUsers = sources.filter(({ text }) => /withSurveyRespondent|@\/lib\/db\/survey["']/.test(text)).map(({ path }) => path);
+    expect(surveyUsers.filter((p) => p !== "lib/db/survey.ts")).toEqual([route]);
+
+    const ownerUsers = sources.filter(({ text }) => /\bdbOwner\b/.test(text)).map(({ path }) => path).sort();
+    expect(ownerUsers).toEqual(["lib/db/index.ts", "lib/db/survey.ts"]);
+
+    const roleUsers = sources.filter(({ text }) => /withSurveyOn\b/.test(text)).map(({ path }) => path).sort();
+    expect(roleUsers).toEqual(["lib/db/survey-role.ts", "lib/db/survey.ts"]);
   });
 });

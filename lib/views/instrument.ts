@@ -69,6 +69,7 @@ type InstrumentRecord = {
   status: InstrumentStatus;
   opensAt: Date | null;
   closesAt: Date | null;
+  tokenEpoch: number;
 };
 
 const iso = (v: unknown) => (v instanceof Date ? v.toISOString().slice(0, 16).replace("T", " ") + " UTC" : null);
@@ -82,4 +83,5 @@ export const instrumentTracked: TrackedField<InstrumentRecord>[] = [
   { field: "anonymity", label: "Anonymity", format: (v) => ANONYMITY_LABELS[v as "anonymous" | "identified"] },
   { field: "opensAt", label: "Opens", format: iso },
   { field: "closesAt", label: "Closes", format: iso },
+  { field: "tokenEpoch", label: "Survey link version" },
 ];

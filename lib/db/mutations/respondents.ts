@@ -21,7 +21,7 @@ export function insertRespondents(tx: Tx, scope: Scope, rows: RespondentFields[]
 }
 
 /** A changed email address revokes the old link (database trigger bumps token_version). */
-export async function updateRespondent(tx: Tx, scope: Scope, respondentId: string, fields: RespondentFields) {
+export async function updateRespondent(tx: Tx, scope: Scope, respondentId: string, fields: RespondentFields & { invitedAt?: null; remindedAt?: null }) {
   const [row] = await tx
     .update(respondent)
     .set(fields)

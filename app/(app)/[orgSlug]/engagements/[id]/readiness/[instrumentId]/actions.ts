@@ -17,6 +17,7 @@ import {
 import { logNote } from "@/lib/db/mutations/messages";
 import { findInstrument, getInstrumentTree } from "@/lib/db/queries/instruments";
 import { CHOICE_TYPES, SCORED_TYPES } from "@/lib/instruments/definition";
+import { sendSurveyEmails } from "@/lib/survey/send";
 import { noteSchema } from "@/lib/validation/engagements";
 import {
   deleteChildSchema,
@@ -96,6 +97,42 @@ export const deleteInstrument = engagementAction("edit", instrumentIdSchema, asy
   const p = paths(ctx, input.instrumentId);
   revalidatePath(p.list);
   return { ok: true, redirectTo: p.list };
+});
+
+// ─── Distribution ────────────────────────────────────────────────────────────────────────────
+
+const notOpen: ActionState = { ok: false, message: "The survey is not open. Open it from the status bar first." };
+
+export const sendInvitations = engagementAction("edit", instrumentIdSchema, async (ctx, input) => {
+  const r = await load(ctx, input.instrumentId);
+  if ("error" in r) return r.error;
+  if (r.row.instrument.status !== "open") return notOpen;
+  const sent = await sendSurveyEmails(ctx, r.row.instrument, "invitation");
+  revalidate(ctx, input.instrumentId);
+  return { ok: true, message: sent ? `${sent} ${sent === 1 ? "invitation" : "invitations"} sent.` : "Everyone has already been invited." };
+});
+
+/** The nudge: emails only people who were invited and have not answered. */
+export const sendReminders = engagementAction("edit", instrumentIdSchema, async (ctx, input) => {
+  const r = await load(ctx, input.instrumentId);
+  if ("error" in r) return r.error;
+  if (r.row.instrument.status !== "open") return notOpen;
+  const sent = await sendSurveyEmails(ctx, r.row.instrument, "reminder");
+  revalidate(ctx, input.instrumentId);
+  return { ok: true, message: sent ? `${sent} ${sent === 1 ? "reminder" : "reminders"} sent.` : "Everyone invited has answered." };
+});
+
+/** Bumps the link version: every link sent so far stops working. Reminders then carry new links. */
+export const revokeLinks = engagementAction("edit", instrumentIdSchema, async (ctx, input) => {
+  const r = await load(ctx, input.instrumentId);
+  if ("error" in r) return r.error;
+  const before = r.row.instrument;
+  await updateInstrumentTracked(ctx.tx, { before, patch: { tokenEpoch: before.tokenEpoch + 1 }, authorUserId: ctx.user.id });
+  revalidate(ctx, input.instrumentId);
+  return {
+    ok: true,
+    message: "Every survey link sent so far has stopped working. Send reminders to give the people who have not answered a new link.",
+  };
 });
 
 // ─── Builder ─────────────────────────────────────────────────────────────────────────────────

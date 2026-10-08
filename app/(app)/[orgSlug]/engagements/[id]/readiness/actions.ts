@@ -6,6 +6,7 @@ import type { ActionState } from "@/lib/auth/action-state";
 import { definitionSchema } from "@/lib/instruments/definition";
 import { BLANK_DEFINITION, createInstrumentFromDefinition, updateInstrumentTracked } from "@/lib/db/mutations/instruments";
 import { findInstrument, findTemplate } from "@/lib/db/queries/instruments";
+import { sendSurveyEmails } from "@/lib/survey/send";
 import { createInstrumentSchema, instrumentStatusSchema } from "@/lib/validation/instruments";
 
 const readinessPath = (orgSlug: string, engagementId: string) => `/${orgSlug}/engagements/${engagementId}/readiness`;
@@ -40,13 +41,23 @@ export const setInstrumentStatus = engagementAction("edit", instrumentStatusSche
     if (input.status === "open" && row.questions === 0) {
       return { ok: false, message: "An instrument needs at least one question before it can open." };
     }
-    await updateInstrumentTracked(ctx.tx, { before: row.instrument, patch: { status: input.status }, authorUserId: ctx.user.id });
+    const after = await updateInstrumentTracked(ctx.tx, { before: row.instrument, patch: { status: input.status }, authorUserId: ctx.user.id });
+    // Opening sends the invitations (to anyone not invited yet, so reopening catches late additions).
+    if (after && input.status === "open") {
+      const sent = await sendSurveyEmails(ctx, after, "invitation");
+      revalidateAll(ctx.org.slug, ctx.engagement.id, input.instrumentId);
+      return { ok: true, message: sent ? `Opened. ${sent} ${sent === 1 ? "invitation" : "invitations"} sent.` : "Opened. Nobody to invite yet: add respondents, then send invitations." };
+    }
   }
-  const base = readinessPath(ctx.org.slug, ctx.engagement.id);
-  revalidatePath(base);
-  revalidatePath(`${base}/${input.instrumentId}`);
+  revalidateAll(ctx.org.slug, ctx.engagement.id, input.instrumentId);
   return { ok: true };
 });
+
+function revalidateAll(orgSlug: string, engagementId: string, instrumentId: string) {
+  const base = readinessPath(orgSlug, engagementId);
+  revalidatePath(base);
+  revalidatePath(`${base}/${instrumentId}`, "layout");
+}
 
 /**
  * Adapts the kit's `(orgSlug, recordId, prev, formData{stage})` move shape to `setInstrumentStatus`.

@@ -14,11 +14,12 @@ import { claimsFor } from "@/lib/auth/session";
 import { withRls } from "@/lib/db";
 import { findInstrument, getInstrumentTree, instrumentIdsInOrder } from "@/lib/db/queries/instruments";
 import { listRecordMessages } from "@/lib/db/queries/messages";
+import { respondentCounts } from "@/lib/db/queries/respondents";
 import { QUESTION_TYPE_LABELS } from "@/lib/instruments/definition";
 import { ANONYMITY_LABELS, INSTRUMENT_KIND_LABELS, INSTRUMENT_KINDS, instrumentModel } from "@/lib/views/instrument";
 import { listContext, parseViewParams, type RawSearchParams } from "@/lib/views/params";
 import { moveInstrument } from "../actions";
-import { deleteInstrument, logInstrumentNote, saveInstrumentSettings } from "./actions";
+import { deleteInstrument, logInstrumentNote, revokeLinks, saveInstrumentSettings, sendReminders } from "./actions";
 
 export const metadata: Metadata = { title: "Assessment" };
 
@@ -49,11 +50,12 @@ export default async function InstrumentPage({
       row,
       tree: await getInstrumentTree(tx, org.id, instrumentId),
       messages: await listRecordMessages(tx, org.id, "instrument", instrumentId),
+      counts: await respondentCounts(tx, org.id, instrumentId),
       ids: fromList ? await instrumentIdsInOrder(tx, org.id, engagement.id, listParams) : [],
     };
   });
   if (!data) notFound();
-  const { row, tree, messages, ids } = data;
+  const { row, tree, messages, ids, counts } = data;
   const inst = row.instrument;
   const isDraft = inst.status === "draft";
 
@@ -78,6 +80,24 @@ export default async function InstrumentPage({
           <Link href={`${base}/${inst.id}/preview` as never} className={buttonVariants({ variant: "outline", size: "sm" })}>
             Preview
           </Link>
+          {canEdit && inst.status === "open" && counts.invited > counts.completed ? (
+            <ActionButton
+              action={bind(sendReminders)}
+              fields={{ instrumentId: inst.id }}
+              label="Send reminders"
+              pendingLabel="Sending…"
+              confirmText={`Email a reminder to the ${counts.invited - counts.completed} people who have not answered?`}
+            />
+          ) : null}
+          {canEdit && !isDraft ? (
+            <ActionButton
+              action={bind(revokeLinks)}
+              fields={{ instrumentId: inst.id }}
+              label="Revoke links"
+              pendingLabel="Revoking…"
+              confirmText="Every survey link sent so far will stop working. People who have not answered will need a reminder with a new link. Continue?"
+            />
+          ) : null}
           {canEdit && isDraft ? (
             <ActionButton
               action={bind(deleteInstrument)}
@@ -98,9 +118,9 @@ export default async function InstrumentPage({
           incomplete={isDraft && row.questions === 0 ? ["Add at least one question."] : []}
           notes={{
             open: isDraft
-              ? "Once it opens, its questions and anonymity are fixed and it cannot go back to draft."
+              ? `Opening emails a survey link to ${counts.total - counts.invited} ${counts.total - counts.invited === 1 ? "person" : "people"}. Once it opens, its questions and anonymity are fixed and it cannot go back to draft.`
               : "Reopening lets people respond again.",
-            closed: "Closing stops new responses. You can reopen it later.",
+            closed: "Closing stops new answers: links stop working until it is reopened.",
             draft: "An assessment that has opened cannot go back to draft. Create a new wave instead.",
           }}
         />
@@ -110,8 +130,8 @@ export default async function InstrumentPage({
           buttons={[
             { label: "Questions", value: row.questions, href: `${base}/${inst.id}/builder` },
             { label: "Dimensions", value: tree.dimensions.length, href: `${base}/${inst.id}/builder#dimensions` },
-            // Respondents arrive with distribution in phase 04.
-            { label: "Respondents", value: "—" },
+            { label: "Respondents", value: counts.total, href: `${base}/${inst.id}/respondents` },
+            { label: "Answered", value: counts.total ? `${counts.completed} / ${counts.total}` : "—", href: `${base}/${inst.id}/respondents?f=completed` },
           ]}
         />
       }

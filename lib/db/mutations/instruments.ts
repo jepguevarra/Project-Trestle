@@ -74,7 +74,7 @@ export const BLANK_DEFINITION = { dimensions: [], sections: [{ title: "Section 1
 
 type InstrumentRow = typeof instrument.$inferSelect;
 export type InstrumentPatch = Partial<
-  Pick<InstrumentRow, "name" | "kind" | "wave" | "waveLabel" | "anonymity" | "opensAt" | "closesAt" | "status">
+  Pick<InstrumentRow, "name" | "kind" | "wave" | "waveLabel" | "anonymity" | "opensAt" | "closesAt" | "status" | "tokenEpoch">
 >;
 
 /**
