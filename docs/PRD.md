@@ -118,11 +118,39 @@ an engagement:
 
 Build the joins from the start even if the UI surfaces them late. See `docs/DATA-MODEL.md`.
 
+## The OCM lifecycle (added October 2026)
+
+The four modules above are the Assess-phase core. Trestle also covers the rest of the OCM lifecycle,
+modelled on the OCM Solution portal's functions and written as Trestle's own: **Assess → Develop →
+Deploy → Normalize → Exit**, shown as the engagement's stage. Full specification in
+`docs/OCM-MODULE.md`. In brief:
+
+- **Checklist**: the OCM method as phased tasks from a template, plus a RACI.
+- **Audiences**: the impacted-group tree and the people in it; stakeholders become assessments of
+  people, with receptiveness, priority A–D and stakeholder/sponsor risk derived.
+- **Changes and impacts**: what is changing, split from which groups it hits, on a No/Low/Mid/High
+  scale; change saturation; a change risk assessment that sets the service tier.
+- **Resistance**: a register of signs, causes, strategies and owners, with hotspot suggestions.
+- **Communications and events**: a comms plan and message library (composed and exported, not sent,
+  in v1), and briefings, roadshows and town halls with attendance.
+- **Champions and training**: the champion network with coverage per impacted group; courses,
+  sessions, enrollment and completion.
+- **Go-live**: a go/no-go milestone with computed gates and a recorded decision; adoption surveys
+  before and after go-live.
+- **Exit**: status reports, the generated OCM playbook, lessons learned, the final OCM report.
+
+Every screen follows the Odoo pattern of apps, list/kanban/form views, statusbar and chatter.
+
+The line that keeps this coherent with `BA-LAYER.md` §4.1: Trestle hands the requirements to the build
+team at the scope baseline and stays with the people through go-live and exit.
+
 ## Explicitly out of scope for v1
 
 - Billing and subscriptions (phase 08 — stub the org plan field and move on)
-- Training plan builder, comms calendar, benefits realisation tracking
-- Post-go-live adoption tracking
+- Benefits realisation tracking
+- Sending communications to the client's staff from Trestle (compose and export only)
+- Delivery tracking of the build: sprints, story monitoring, defect management beyond the UAT log
+- ITIL change control, and change with no system attached (`POSITIONING.md` §1)
 - Integration with any actual ERP (yes, including Odoo — resist this)
 - Mobile apps; the respondent survey page must work well on a phone browser, that is all
 - Custom scoring formulas per firm; v1 has weighted-average only
@@ -147,3 +175,6 @@ The phase order in `docs/plan/` is deliberately sequenced so that **after phase 
 something sellable**: a readiness assessment that runs end to end and produces a report. If you
 need to show a client something, stop there and sell it. Phases 06–12 add the rest, and the plan is
 staged so a deadline truncates it rather than breaking it.
+
+The OCM lifecycle roughly doubles the remaining build (phases 02b and 13–20). It does not move the
+first sellable point or the capstone minimum.

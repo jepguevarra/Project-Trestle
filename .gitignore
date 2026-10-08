@@ -40,3 +40,6 @@ supabase/.temp/
 # Playwright
 /test-results/
 /playwright-report/
+
+# Third-party OCM reference material (OCM Solution templates) — never commit; see CLAUDE.md
+/Change Management Resources/

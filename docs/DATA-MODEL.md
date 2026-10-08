@@ -37,9 +37,13 @@ client                  the company being implemented at
 
 engagement              one change programme — everything hangs off this
   id, org_id, client_id, name, type, target_system, target_go_live (date),
-  status, created_by
-  type:   packaged_software | custom_build | platform_migration | automation | digitalisation
-  status: active | archived
+  status, created_by,
+  -- phase 02b, Project Essentials (OCM-MODULE.md §5.1):
+  start_date (date), end_date (date), ocm_stage, objectives, scope_summary,
+  success_criteria, transition_owner
+  type:      packaged_software | custom_build | platform_migration | automation | digitalisation
+  status:    active | archived
+  ocm_stage: assess | develop | deploy | normalize | exit     default assess
   index (org_id, status)
 
 engagement_assignment   consultant/viewer scoping
@@ -59,6 +63,9 @@ records.
 **`engagement.status`** is the pricing meter. `active` counts against the plan's limit; `archived` is
 free, unlimited, and permanently readable — see §11 and `BUSINESS-MODEL.md` §5.
 
+**`engagement.ocm_stage`** is the OCM phase, shown as the statusbar (`OCM-MODULE.md` §4.1). It is set
+by the consultant, never computed, and is independent of `status`: reaching `exit` does not archive.
+
 ---
 
 ## 2. The instrument engine
@@ -73,8 +80,10 @@ instrument_template     reusable definition, not tied to an engagement
 
 instrument              a live run inside one engagement
   id, org_id, engagement_id, template_id (nullable), name, kind,
+  wave (smallint, default 1), wave_label,
   anonymity, opens_at, closes_at, status, token_secret, created_by
-  kind:      readiness | sponsor | pulse | custom
+  kind:      readiness | sponsor | pulse | go_live_adoption | post_go_live_adoption
+           | training_feedback | champion | coaching | communication_feedback | custom
   anonymity: identified | anonymous
   status:    draft | open | closed
   token_secret: random bytes — rotating it revokes every outstanding link
@@ -98,6 +107,10 @@ question_option         for choice types
 `dimension.weight` and `question.weight` are both `numeric` and both default to 1. Scoring normalises;
 weights never have to sum to anything.
 
+`wave` numbers repeated runs of the same kind in one engagement (Baseline, Readiness #2,
+Pre-go-live) so scores trend across waves. The full `kind` enum ships with the table in phase 03 even
+though most kinds get their templates later — see `OCM-MODULE.md` §5.6.
+
 `is_reverse_scored` matters more than it looks — a reverse-worded item that is not flagged silently
 inverts a dimension score, and reverse-worded items are how straight-lining is detected (§4).
 
@@ -108,6 +121,7 @@ inverts a dimension score, and reverse-worded items are how straight-lining is d
 ```
 respondent
   id, org_id, instrument_id, name, email, department, role_title, seniority,
+  person_id (nullable), org_unit_id (nullable),            -- phase 07
   invited_at, reminded_at, completed_at, token_version
   seniority: frontline | supervisor | manager | executive
   unique (instrument_id, email)
@@ -115,7 +129,7 @@ respondent
 response
   id, org_id, instrument_id, question_id,
   respondent_id (nullable — see below),
-  department, role_title, seniority,          -- denormalised at submit time
+  department, role_title, seniority, org_unit_id,          -- denormalised at submit time
   value_numeric, value_text, answered_at
   index (instrument_id, question_id)
   index (org_id)
@@ -126,6 +140,10 @@ response
 Breakdowns by department, role and seniority must work **without joining back to `respondent`**,
 because on an anonymous instrument that join is exactly what must be impossible. Copying the three
 attributes at submit time makes the anonymous case structurally safe rather than safe-by-convention.
+
+`org_unit_id` (phase 07) is copied the same way, for readiness per audience. `person_id` lives only
+on `respondent`, exactly like `email`: it is identity, and an anonymous instrument severs it from the
+answers on submit. Readiness per org unit is a segment like any other, so n ≥ 5 applies.
 
 ### The anonymity mechanism
 
@@ -169,6 +187,25 @@ arrays, per `ARCHITECTURE.md`, so the numbers are unit-testable and auditable.
 
 Compute on read for v1. Cache only when a real dashboard feels slow.
 
+### 4.1 OCM metrics, also derived
+
+Same rules: pure functions in `lib/scoring/`, unit-tested, nothing stored. Definitions are in
+`OCM-MODULE.md`; this is the index.
+
+| Output | Rule | Spec |
+|---|---|---|
+| Change risk score and band | Mean of six 1–3 factors, two reversed; Low < 1.67 ≤ Mid < 2.34 ≤ High | §5.2 |
+| Receptiveness | From `current_stance`: opposed Low, neutral Mid, supportive/champion High | §5.4 |
+| Stakeholder priority A–D | Influence ≥ 4 × org unit at impact level `high` | §5.4 |
+| Stakeholder and sponsor risk | Banded rules, averaged for the Overview tile | §5.4 |
+| Impacted individuals | Leaf-level headcount; never parent plus children | §5.3 |
+| Change saturation | Confirmed changes per org unit at level `low` or above | §5.5 |
+| Readiness per audience | Segment breakdown on `response.org_unit_id`, n ≥ 5 | §5.6 |
+| Champion coverage | ⌈impacted individuals ÷ org ratio⌉ per org unit vs active champions | §5.10 |
+| Training completion | Completed ÷ required enrollments | §5.11 |
+| Adoption score | Index of the latest `go_live_adoption` / `post_go_live_adoption` instrument | §5.12 |
+| Phase progress | Done ÷ (tasks − cancelled) per `ocm_stage` | §4.2 |
+
 ---
 
 ## 5. The evidence spine
@@ -203,32 +240,58 @@ over `elicitation_source` joined to its participants, with counts of what each s
 
 ---
 
-## 6. Stakeholders
+## 6. Audiences and stakeholders
+
+Revised for the OCM module (`OCM-MODULE.md` §5.3–5.4): `org_unit` arrives here in phase 07 rather
+than with impacts, and a stakeholder is an assessment **of a person** rather than a free-standing
+name. Phase 07 is not built, so this costs nothing yet.
 
 ```
-stakeholder
-  id, org_id, engagement_id, name, title, department, email, is_sponsor,
-  influence (1-5), interest (1-5), current_stance, target_stance, adkar_state, notes
-  stance:      opposed | neutral | supportive | champion
-  adkar_state: awareness | desire | knowledge | ability | reinforcement | null
+org_unit                the impacted-group tree (OCMS "audiences", levels L1/L2/L3…)
+  id, org_id, engagement_id, name, parent_id (self-ref), headcount,
+  is_external, location
+
+person                  an individual in the client's organisation (Trestle's res.partner)
+  id, org_id, engagement_id, name, email, job_title, org_unit_id (nullable),
+  manager_id (self-ref, nullable), location, category, is_direct, notes
+  category: internal | external
+  unique (engagement_id, lower(email)) where email is not null
+
+stakeholder             an assessment of one person
+  id, org_id, engagement_id, person_id, is_sponsor,
+  influence (1-5), interest (1-5), current_stance, target_stance, adkar_state,
+  availability, sponsor_commitment, sponsor_visibility, notes
+  stance:       opposed | neutral | supportive | champion
+  adkar_state:  awareness | desire | knowledge | ability | reinforcement | null
+  availability, sponsor_commitment, sponsor_visibility: low | mid | high | null
+  unique (engagement_id, person_id)
 
 stakeholder_interaction
   id, org_id, stakeholder_id, occurred_at, channel, notes,
   next_action, owner_user_id, due_date, status
-  status: open | done | cancelled
+  channel: meeting | call | email | workshop | coaching | other
+  status:  open | done | cancelled
+
+org_unit_readiness_profile    consultant-rated, never blended into the readiness index
+  id, org_id, engagement_id, org_unit_id, wave,
+  awareness, buy_in, knowledge, proficiency, capacity,          -- low | mid | high
+  past_change_experience,     -- negative | none | positive
+  manager_style,              -- consensus | bureaucratic | concentrated
+  culture,                    -- community | competitive | entrepreneurial
+  documentation_updates,      -- low | mid | high
+  notes
+  unique (org_unit_id, wave)
 ```
 
-The influence/interest grid, the stance heat strip and the engagement backlog (where
-`current_stance <> target_stance`) are all derived. No stored quadrant.
+The influence/interest grid, the stance heat strip, the engagement backlog (where
+`current_stance <> target_stance`), receptiveness, priority A–D and stakeholder risk are all derived
+(§4.1). No stored quadrant, no stored risk.
 
 ---
 
-## 7. Org units, processes, steps
+## 7. Processes, steps
 
 ```
-org_unit
-  id, org_id, engagement_id, name, parent_id (self-ref), headcount
-
 process
   id, org_id, engagement_id, name, org_unit_id, owner_stakeholder_id,
   parent_id (self-ref — functional decomposition), frequency, criticality (1-5),
@@ -259,21 +322,39 @@ candidate requirement. Do not let it become a free-text field on `process_step`.
 
 ---
 
-## 8. Impacts and mitigations
+## 8. Changes, impacts, mitigations, change risk
+
+Revised for the OCM module (`OCM-MODULE.md` §5.2, §5.5): *what is changing* is split from *which
+groups it hits*, and severity moves from 1–5 to the four-level scale the OCM practice uses.
 
 ```
-impact
-  id, org_id, engagement_id, process_id (nullable), org_unit_id,
-  type, as_is, to_be, severity (1-5), affected_headcount
-  type: process | people | technology | policy | data
+change                  one thing that is changing
+  id, org_id, engagement_id, ref (unique per engagement), title,
+  as_is, to_be, category, process_id (nullable), status
+  category: process | people | technology | policy | data
+  status:   draft | confirmed
+
+impact                  one change × one org unit
+  id, org_id, engagement_id, change_id, org_unit_id,
+  level, affected_headcount, description, needs_training, needs_communication
+  level: none | low | mid | high
+  unique (change_id, org_unit_id)
 
 mitigation
   id, org_id, impact_id, action, owner_user_id, owner_name, due_date, status
   status: not_started | in_progress | done | blocked
+
+change_risk_assessment  one current row per engagement; history in chatter
+  id, org_id, engagement_id,
+  impact_breadth, impact_depth, visibility, strategic_risk,      -- 1-3
+  pm_ocm_experience, pm_ocm_bandwidth,                            -- 1-3, reverse-scored
+  notes, assessed_at, assessed_by
+  unique (engagement_id)
 ```
 
-Heatmap cell = **max** severity in the cell, with the count carried alongside. A mean would hide the
-one severity-5 impact behind four severity-1s.
+Heatmap cell = **max** level in the cell, with the count carried alongside. A mean would hide the one
+`high` impact behind four `low`s. A `none` row is a finding (assessed, unaffected), not a gap.
+Ranking weight is `low` 1, `mid` 2, `high` 3.
 
 ---
 
@@ -340,6 +421,11 @@ two requirements with conflicting dispositions on one process.
 
 The two bolded checks are only computable because readiness, stakeholders, processes and requirements
 share this model. They are the concrete proof the modules are one product.
+
+The OCM module adds three more of the same kind (`OCM-MODULE.md` §6): **a `high` impact with no
+communication and no training covering its org unit** · **a must-have requirement on a process whose
+org unit has open `high` resistance** · **a `go` decision with failing gates and no recorded
+conditions**. Plus one local check: a RACI deliverable without exactly one `A`.
 
 ---
 
@@ -503,6 +589,10 @@ For **every** tenant-scoped table, an integration test proving a user in org A c
 - `respondent(instrument_id, completed_at)` — completion tracking and nudges
 - `requirement(engagement_id, ref)` unique
 - Both columns of every link table in §9
+- `change(engagement_id, ref)` unique; `impact(change_id, org_unit_id)` unique
+- `task(engagement_id, phase, status)` — the checklist and phase progress read this
+- `record_message(res_type, res_id, created_at)` — every chatter read
+- Both columns of every OCM link table in §15 (`*_org_unit`, `event_attendee`)
 
 ---
 
@@ -516,3 +606,228 @@ get wrong:
 2. **`elicitation_source` ships before `process` carries real data** (phase 06, ahead of phase 09). It
    is a foreign key on half the model, and retrofitting it leaves records whose provenance is
    permanently unknown.
+
+Two more from the OCM module:
+
+3. **`instrument.kind` ships with its full enum and `wave` in phase 03.** Cheap now; adding them
+   after instruments carry responses means backfilling waves on live data.
+4. **`org_unit` and `person` ship in phase 07, before impacts (08) and every OCM plan table (15–17).**
+   Impacts, communications, events, champions and training all target org units or people.
+
+---
+
+## 15. The OCM lifecycle tables
+
+Phases 14–20. Fields and behaviour are specified in `OCM-MODULE.md`; this is the schema. Every table
+carries `org_id` and `engagement_id` (except org-level libraries), gets the engagement-scoped policies
+in §12, and gets the cross-org RLS test.
+
+### 15.1 Checklist and RACI (phase 14)
+
+```
+task_template           a reusable checklist; org_id null = shipped with Trestle
+  id, org_id (nullable), name, is_system
+
+task_template_line
+  id, org_id (nullable), task_template_id, phase, sort_order, name, description, tool_key
+
+task
+  id, org_id, engagement_id, task_template_line_id (nullable), phase, sort_order,
+  name, description, tool_key, assignee_user_id (nullable), assignee_name,
+  start_date, due_date, status, completed_at,
+  res_type (nullable), res_id (nullable)          -- the record this task is about; see §16
+  phase:  assess | develop | deploy | normalize | exit
+  status: todo | in_progress | done | blocked | cancelled
+
+raci_role
+  id, org_id, engagement_id, name, person_id (nullable), sort_order
+
+raci_entry
+  id, org_id, engagement_id, deliverable, task_id (nullable), raci_role_id, letter
+  letter: R | A | C | I
+  unique (raci_role_id, coalesce(task_id::text, deliverable))
+```
+
+### 15.2 Resistance (phase 15)
+
+```
+resistance
+  id, org_id, engagement_id, org_unit_id (nullable), stakeholder_id (nullable),
+  level, signs (text[]), causes (text[]), strategies (text[]),
+  description, action_plan, owner_user_id, due_date, status, source, source_id (nullable)
+  level:  low | mid | high
+  status: identified | mitigating | resolved | escalated
+  source: observed | survey | interview | champion_report
+  check (org_unit_id is not null or stakeholder_id is not null)
+```
+
+`signs`, `causes` and `strategies` hold keys from fixed lists in `lib/ocm/resistance.ts`, validated
+by Zod. Arrays rather than link tables because the lists are closed and never joined.
+
+### 15.3 Communications and events (phase 16)
+
+```
+channel                 org-level library; org_id null = shipped
+  id, org_id (nullable), kind, name, description, default_frequency, delivered_by
+  kind: communication | engagement
+
+communication_template  org-level message library; org_id null = shipped
+  id, org_id (nullable), purpose, direction, name, subject, body
+  direction: internal | external
+
+communication
+  id, org_id, engagement_id, ref, purpose, direction, objective, channel_id (nullable),
+  message_theme, sender_person_id (nullable), owner_user_id, planned_date, sent_at,
+  status, template_id (nullable), subject, body, recipients_count,
+  opened_count, clicked_count                     -- manual, optional
+  purpose: awareness | impacts | progress_update | timeline_change | faq | countdown
+         | go_decision | no_go_decision | go_live | post_go_live | support | training
+         | champions | uat | closure | other
+  status:  draft | in_review | approved | scheduled | sent | cancelled
+
+communication_org_unit  org_id, communication_id, org_unit_id
+
+event
+  id, org_id, engagement_id, kind, title, starts_at, ends_at, location,
+  presenter_person_id (nullable), invited_count, attended_count, status, notes
+  kind:   kickoff | roadshow | town_hall | briefing | workshop | feedback_session
+        | drop_in_support | qa_session | champion_meeting | stakeholder_roundtable
+        | sponsor_activity
+  status: planned | done | cancelled
+
+event_org_unit          org_id, event_id, org_unit_id
+event_attendee          org_id, event_id, person_id, invited, attended
+```
+
+When `event_attendee` rows exist they are the source of the counts; otherwise the typed counts are.
+
+### 15.4 Champions and training (phase 17)
+
+```
+champion
+  id, org_id, engagement_id, person_id, org_unit_id, nominated_by_person_id (nullable),
+  status, hours_per_week, kickoff_attended, recognised_on, notes
+  status: identified | nominated | committed | onboarded | active | inactive | exited
+  unique (engagement_id, person_id)
+
+training_course
+  id, org_id, engagement_id, name, level, method, target_role, duration_minutes,
+  owner_user_id, materials_status, status
+  level:            basic | intermediate | advanced
+  method:           classroom | workshop | elearning | on_the_job | webinar | briefing
+  materials_status: not_started | drafting | ready
+  status:           planned | active | completed | cancelled
+
+training_course_org_unit  org_id, training_course_id, org_unit_id
+
+training_session
+  id, org_id, engagement_id, training_course_id, starts_at, ends_at, trainer,
+  location, capacity, status
+  status: planned | done | cancelled
+
+training_enrollment
+  id, org_id, engagement_id, training_course_id, training_session_id (nullable),
+  person_id, status, completed_at, feedback_score
+  status: invited | registered | attended | completed | no_show
+  unique (training_course_id, person_id)
+```
+
+```
+organization_setting    small per-firm settings; admin+ writes
+  id, org_id, key, value (jsonb)
+  key: champion_ratio
+  unique (org_id, key)
+```
+
+The champion ratio for coverage is `champion_ratio`, default 25 when no row exists.
+
+### 15.5 Milestones, go-live and adoption (phases 13 and 18)
+
+```
+milestone               DASHBOARD.md §1, plus kind go_no_go
+  id, org_id, engagement_id, name, kind, target_date, sort_order
+  kind: discovery_complete | scope_baseline | readiness_gate | data_ready
+      | go_no_go | handover | go_live | custom
+
+milestone_gate
+  id, org_id, milestone_id, metric_key, comparator, threshold, label
+  comparator: gte | lte | eq
+
+go_live_decision
+  id, org_id, engagement_id, milestone_id, decision, conditions,
+  decided_by_person_id, decided_on, communication_id (nullable)
+  decision: go | no_go | conditional
+```
+
+New `metric_key` values: `training_completion_ratio`, `comms_coverage_gaps`, `open_high_resistance`,
+`champion_coverage_gaps`, `adoption_score`, `uat_pass_ratio`, `stage_open_tasks`.
+
+### 15.6 Reporting, playbook, transition, library (phases 13 and 19)
+
+```
+saved_view              Favorites in the control panel (OCM-MODULE.md §7.2)
+  id, org_id, user_id, model, name, params (jsonb), is_default
+
+status_report
+  id, org_id, engagement_id, period_start, period_end,
+  accomplishments (text[]), risks (text[]), horizon (text[]),
+  status, metrics_snapshot (jsonb, written once on publish), published_at
+  status: draft | published
+
+playbook_section
+  id, org_id, engagement_id, section_key, body
+  unique (engagement_id, section_key)
+
+lesson_learned
+  id, org_id, engagement_id, phase, category, description, recommendation, created_by
+  category: went_well | improve | risk_realised
+
+library_item            the firm's own resource library, tagged by phase and app
+  id, org_id, title, description, phase (nullable), tool_key (nullable),
+  storage_path, filename, mime_type, byte_size
+```
+
+`status_report.metrics_snapshot` is the one deliberate stored copy of derived numbers: a published
+status report is a historical statement and must not change when the registers do.
+
+### 15.7 UAT (phase 20, optional)
+
+```
+uat_case
+  id, org_id, engagement_id, ref, title, steps, expected_result,
+  requirement_id (nullable), assignee_person_id (nullable), status,
+  tester_notes, defect_link, target_date
+  status: not_run | passed | failed | blocked
+```
+
+---
+
+## 16. Chatter: the one polymorphic table
+
+§9 rejects a generic `(from_type, from_id, to_type, to_id)` edge table for traceability, and that
+stands. The Odoo-style chatter (`OCM-MODULE.md` §7.6) needs a message log on every model, and a
+narrow table per model would be thirty identical tables. The reasons against polymorphism in §9 do
+not apply here:
+
+- **RLS** stays a single indexed predicate, because `org_id` and `engagement_id` are denormalised
+  onto the row like everywhere else. The policy never looks at `res_type`.
+- **Integrity** matters less: a message is a display log, not evidence. Nothing is computed from it
+  and no report traces through it.
+- **Orphans** are prevented by one generic `after delete` trigger, `private.delete_record_messages()`,
+  attached to every model that has chatter.
+
+```
+record_message
+  id, org_id, engagement_id (nullable for org-level records), res_type, res_id,
+  kind, body, tracking (jsonb), author_user_id, created_at
+  kind: note | tracking | system
+  tracking: [{ field, label, old, new }]
+  index (res_type, res_id, created_at)
+```
+
+Tracking rows are written by `engagementAction`, which diffs each model's declared tracked fields in
+the same transaction as the write. `task.res_type/res_id` (§15.1) follows the same reasoning and the
+same trigger: it is how "Schedule task" in chatter links a task to its record.
+
+Allowed `res_type` values are a closed list in `lib/views/registry.ts`, validated by Zod on every
+write. A polymorphic column that accepts any string is how this pattern goes wrong.
