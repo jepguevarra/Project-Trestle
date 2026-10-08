@@ -21,7 +21,8 @@
     "db:studio": "drizzle-kit studio",
     "db:seed": "tsx lib/db/seed.ts",
     "db:test:start": "bash scripts/test-db.sh start",
-    "db:test:stop": "bash scripts/test-db.sh stop"
+    "db:test:stop": "bash scripts/test-db.sh stop",
+    "instruments:doc": "tsx --tsconfig tsconfig.json scripts/instrument-doc.ts"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.7",

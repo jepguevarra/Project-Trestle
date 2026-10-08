@@ -3,6 +3,7 @@ import { drizzle } from "drizzle-orm/postgres-js";
 import { migrate } from "drizzle-orm/postgres-js/migrator";
 import postgres from "postgres";
 import type { TestProject } from "vitest/node";
+import { syncSystemTemplates } from "../../lib/db/system-templates";
 
 declare module "vitest" {
   export interface ProvidedContext {
@@ -33,7 +34,9 @@ export default async function setup(project: TestProject) {
 
   const client = postgres(testUrl, { max: 1, onnotice: () => {} });
   await client.unsafe(readFileSync(new URL("./supabase-shim.sql", import.meta.url), "utf8"));
-  await migrate(drizzle(client), { migrationsFolder: "drizzle" });
+  const db = drizzle(client);
+  await migrate(db, { migrationsFolder: "drizzle" });
+  await syncSystemTemplates(db);
   await client.end();
 
   project.provide("rlsDatabaseUrl", testUrl);

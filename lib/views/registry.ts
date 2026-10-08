@@ -5,6 +5,6 @@ import { z } from "zod";
  * mirrors it with a CHECK constraint (drizzle/0002_view_kit.sql), and every write is validated here
  * first. Add a model in both places, in the same commit.
  */
-export const RES_TYPES = ["client", "engagement"] as const;
+export const RES_TYPES = ["client", "engagement", "instrument"] as const;
 export type ResType = (typeof RES_TYPES)[number];
 export const resTypeSchema = z.enum(RES_TYPES);

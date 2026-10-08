@@ -40,7 +40,7 @@ export const recordMessage = pgTable(
       columns: [t.engagementId, t.orgId],
       foreignColumns: [engagement.id, engagement.orgId],
     }).onDelete("cascade"),
-    check("record_message_res_type_check", sql`${t.resType} in ('client', 'engagement')`),
+    check("record_message_res_type_check", sql`${t.resType} in ('client', 'engagement', 'instrument')`),
     check(
       "record_message_kind_payload_check",
       sql`(${t.kind} = 'tracking') = (${t.tracking} is not null) and (${t.kind} = 'tracking' or ${t.body} is not null)`,

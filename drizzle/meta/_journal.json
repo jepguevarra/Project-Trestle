@@ -22,6 +22,13 @@
       "when": 1791437045669,
       "tag": "0002_view_kit",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1791438629430,
+      "tag": "0003_instrument_engine",
+      "breakpoints": true
     }
   ]
 }

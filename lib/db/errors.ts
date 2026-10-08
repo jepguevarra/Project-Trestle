@@ -32,6 +32,12 @@ export function pgErrorMessage(err: unknown): string | undefined {
       return "This invitation is invalid, has already been used, or has expired.";
     case "TR405":
       return "Only an admin can change an engagement's client, type or status.";
+    case "TR422":
+      return "An instrument needs at least one question before it can open.";
+    case "TR423":
+      return "A draft must open before it can close, and an opened instrument never goes back to draft. Create a new wave instead.";
+    case "TR424":
+      return "Anonymity is fixed once an instrument has opened: respondents were told how their answers would be used.";
     case "TR409":
       return "An organisation must keep at least one owner.";
     default:
