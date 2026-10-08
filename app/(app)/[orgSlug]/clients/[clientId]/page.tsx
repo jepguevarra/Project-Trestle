@@ -2,83 +2,127 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { z } from "zod";
-import { ClientForm } from "@/components/clients/client-form";
-import { EngagementTable } from "@/components/engagements/engagement-table";
+import { buttonVariants } from "@/components/ui/button";
+import { Chatter } from "@/components/views/chatter";
+import { FormView, type Pager } from "@/components/views/form-view";
+import { InlineList } from "@/components/views/inline-list";
+import { RecordForm } from "@/components/views/record-form";
+import { SmartButtons } from "@/components/views/smart-buttons";
 import { requireMembership } from "@/lib/auth/membership";
 import { hasRole } from "@/lib/auth/roles";
 import { claimsFor } from "@/lib/auth/session";
 import { withRls } from "@/lib/db";
+import { clientIdsInOrder } from "@/lib/db/queries/client-collection";
 import { findClient } from "@/lib/db/queries/clients";
 import { listClientEngagements } from "@/lib/db/queries/engagements";
-import { SIZE_BAND_LABELS } from "@/lib/validation/engagements";
-import { updateClient } from "../actions";
+import { listRecordMessages } from "@/lib/db/queries/messages";
+import { INDUSTRIES, SIZE_BAND_LABELS, SIZE_BANDS } from "@/lib/validation/engagements";
+import { clientModel } from "@/lib/views/client";
+import { OCM_STAGE_LABELS } from "@/lib/views/engagement";
+import { listContext, parseViewParams, type RawSearchParams } from "@/lib/views/params";
+import { logClientNote, saveClient } from "../actions";
+import { clientFields } from "../fields";
 
 export const metadata: Metadata = { title: "Client" };
 
-export default async function ClientPage({ params }: { params: Promise<{ orgSlug: string; clientId: string }> }) {
+export default async function ClientPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ orgSlug: string; clientId: string }>;
+  searchParams: Promise<RawSearchParams>;
+}) {
   const { orgSlug, clientId } = await params;
+  const raw = await searchParams;
   const { user, org, role } = await requireMembership(orgSlug);
   if (!z.uuid().safeParse(clientId).success) notFound();
+  const isAdmin = hasRole(role, "admin");
+  const listParams = parseViewParams(raw, clientModel);
+  const context = listContext(listParams, clientModel);
 
   const data = await withRls(claimsFor(user), async (tx) => {
     const client = await findClient(tx, org.id, clientId);
-    return client ? { client, engagements: await listClientEngagements(tx, org.id, clientId) } : null;
+    if (!client) return null;
+    return {
+      client,
+      engagements: await listClientEngagements(tx, org.id, clientId),
+      messages: await listRecordMessages(tx, org.id, "client", clientId),
+      ids: Object.keys(raw).length ? await clientIdsInOrder(tx, org.id, listParams) : [],
+    };
   });
   if (!data) notFound();
-  const { client, engagements } = data;
-  const isAdmin = hasRole(role, "admin");
+  const { client, engagements, messages, ids } = data;
+
+  const base = `/${org.slug}/clients`;
+  const at = ids.indexOf(client.id);
+  const recordHref = (id: string) => `${base}/${id}${context ? `?${context}` : ""}`;
+  const pager: Pager | null =
+    at >= 0 ? { index: at + 1, total: ids.length, prevHref: at > 0 ? recordHref(ids[at - 1]!) : null, nextHref: at < ids.length - 1 ? recordHref(ids[at + 1]!) : null } : null;
 
   return (
-    <div className="grid gap-8">
-      <div>
-        <p className="text-sm text-muted-foreground">
-          <Link href={`/${org.slug}/clients` as never} className="underline-offset-4 hover:underline">
-            Clients
+    <FormView
+      breadcrumbs={[{ label: "Clients", href: `${base}${context ? `?${context}` : ""}` }, { label: client.name }]}
+      pager={pager}
+      headerButtons={
+        isAdmin ? (
+          <Link href={`/${org.slug}/engagements/new?client=${client.id}` as never} className={buttonVariants({ variant: "outline", size: "sm" })}>
+            New engagement
           </Link>
-        </p>
-        <h1 className="mt-1 text-xl font-semibold">{client.name}</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          {[client.industry, client.sizeBand ? SIZE_BAND_LABELS[client.sizeBand] : null].filter(Boolean).join(" · ") ||
-            "Industry and size not set"}
-        </p>
-      </div>
-
-      <section aria-labelledby="client-engagements" className="grid gap-3">
-        <div className="flex flex-wrap items-baseline justify-between gap-2">
-          <h2 id="client-engagements" className="text-sm font-semibold">
-            Engagements
-          </h2>
-          {isAdmin ? (
-            <Link
-              href={`/${org.slug}/engagements?client=${client.id}#new-engagement` as never}
-              className="text-sm text-primary underline-offset-4 hover:underline"
-            >
-              New engagement for {client.name}
-            </Link>
-          ) : null}
-        </div>
-        {engagements.length ? (
-          <EngagementTable orgSlug={org.slug} rows={engagements} showClient={false} showStatus />
-        ) : (
-          <p className="text-sm text-muted-foreground">No engagements visible to you.</p>
-        )}
-      </section>
-
-      {isAdmin ? (
-        <section aria-labelledby="edit-client" className="rounded-md border border-border bg-card p-4">
-          <h2 id="edit-client" className="mb-3 text-sm font-semibold">
-            Client details
-          </h2>
-          <ClientForm action={updateClient.bind(null, org.slug)} client={client} submitLabel="Save client" />
-        </section>
-      ) : client.notes ? (
-        <section aria-labelledby="client-notes">
-          <h2 id="client-notes" className="mb-1 text-sm font-semibold">
-            Notes
-          </h2>
-          <p className="text-sm whitespace-pre-wrap">{client.notes}</p>
-        </section>
-      ) : null}
-    </div>
+        ) : null
+      }
+      smartButtons={
+        <SmartButtons
+          buttons={[
+            {
+              label: "Engagements",
+              value: engagements.length,
+              href: `/${org.slug}/engagements?s=${encodeURIComponent(`client:${client.name}`)}&f=`,
+            },
+          ]}
+        />
+      }
+      chatter={<Chatter messages={messages} noteAction={isAdmin ? logClientNote.bind(null, org.slug) : undefined} hidden={{ clientId: client.id }} />}
+    >
+      <RecordForm
+        canEdit={isAdmin}
+        action={saveClient.bind(null, org.slug)}
+        hidden={{ clientId: client.id }}
+        titleField="name"
+        values={{ name: client.name, industry: client.industry ?? "", sizeBand: client.sizeBand ?? "", notes: client.notes ?? "" }}
+        fields={clientFields(INDUSTRIES, SIZE_BANDS.map((b) => ({ value: b, label: SIZE_BAND_LABELS[b] })))}
+        groups={[["industry"], ["sizeBand"]]}
+        tabs={[
+          {
+            key: "engagements",
+            label: "Engagements",
+            content: (
+              <InlineList
+                columns={[
+                  { key: "name", label: "Engagement" },
+                  { key: "system", label: "System" },
+                  { key: "stage", label: "Stage" },
+                  { key: "status", label: "Status" },
+                ]}
+                rows={engagements.map((e) => ({
+                  id: e.id,
+                  cells: {
+                    name: (
+                      <Link href={`/${org.slug}/engagements/${e.id}/overview` as never} className="text-primary underline-offset-4 hover:underline">
+                        {e.name}
+                      </Link>
+                    ),
+                    system: e.targetSystem,
+                    stage: OCM_STAGE_LABELS[e.ocmStage],
+                    status: e.status === "archived" ? "Archived" : "Active",
+                  },
+                }))}
+                emptyText="No engagements visible to you."
+              />
+            ),
+          },
+          { key: "notes", label: "Notes", fields: ["notes"] },
+        ]}
+      />
+    </FormView>
   );
 }

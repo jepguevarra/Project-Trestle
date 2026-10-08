@@ -1,12 +1,15 @@
 import Link from "next/link";
-import { EngagementTable } from "@/components/engagements/engagement-table";
 import { GettingStarted } from "@/components/org/getting-started";
+import { ListView } from "@/components/views/list-view";
 import { requireMembership } from "@/lib/auth/membership";
 import { hasRole, ROLE_LABELS } from "@/lib/auth/roles";
 import { claimsFor } from "@/lib/auth/session";
 import { withRls } from "@/lib/db";
 import { listRecentActiveEngagements } from "@/lib/db/queries/engagements";
 import { getSetupProgress } from "@/lib/db/queries/onboarding";
+import { engagementModel } from "@/lib/views/engagement";
+import { parseViewParams } from "@/lib/views/params";
+import { engagementRows } from "@/lib/views/rows";
 
 const ROLE_INTRO = {
   consultant: "You run the engagements you have been added to. They are listed below; open one to work on it.",
@@ -44,7 +47,15 @@ export default async function OrgDashboard({ params }: { params: Promise<{ orgSl
           </Link>
         </div>
         {engagements.length ? (
-          <EngagementTable orgSlug={org.slug} rows={engagements} />
+          <ListView
+            model={{ ...engagementModel, columns: engagementModel.columns.filter((c) => !c.optional) }}
+            params={parseViewParams({}, engagementModel)}
+            base={`/${org.slug}/engagements`}
+            rows={engagementRows(engagements, org.slug, "", null)}
+            groups={[]}
+            emptyText=""
+            plain
+          />
         ) : (
           <p className="text-sm text-muted-foreground">
             {isAdmin

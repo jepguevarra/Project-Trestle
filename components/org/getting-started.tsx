@@ -16,14 +16,14 @@ export function GettingStarted({
     {
       title: "Add a client",
       body: "The company you are preparing for a new system, for example a distributor moving onto Odoo.",
-      href: `${base}/clients#new-client`,
+      href: `${base}/clients/new`,
       action: "Add a client",
       done: progress.hasClient,
     },
     {
       title: "Create an engagement",
       body: "One piece of work for that client: the system being introduced, its type and a target go-live date. Everything else in Trestle hangs off an engagement.",
-      href: `${base}/engagements#new-engagement`,
+      href: `${base}/engagements/new`,
       action: "Create an engagement",
       done: progress.hasEngagement,
     },
@@ -37,7 +37,7 @@ export function GettingStarted({
     {
       title: "Put people on the engagement",
       body: "Consultants and viewers only see the engagements they are added to. Owners and admins see everything.",
-      href: progress.firstEngagementId ? `${base}/engagements/${progress.firstEngagementId}#team-heading` : `${base}/engagements`,
+      href: progress.firstEngagementId ? `${base}/engagements/${progress.firstEngagementId}/settings` : `${base}/engagements`,
       action: "Open the engagement",
       done: progress.hasAssignment,
     },

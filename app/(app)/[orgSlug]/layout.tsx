@@ -21,7 +21,7 @@ export default async function OrgLayout({ children, params }: { children: ReactN
             TRESTLE
           </Link>
           <OrgSwitcher current={org} orgs={orgs} />
-          <nav className="flex gap-1 text-sm" aria-label="Organisation">
+          <nav className="flex flex-wrap gap-1 text-sm" aria-label="Organisation">
             <Link href={base as never} className="rounded-md px-2 py-1 hover:bg-muted">
               Dashboard
             </Link>

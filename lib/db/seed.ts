@@ -4,7 +4,7 @@ import { and, eq, isNull, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
 import { generateInvitationToken, hashInvitationToken, INVITATION_TTL_MS } from "../tokens/invitation";
-import { client, engagement, engagementAssignment, invitation, membership, organization } from "./schema";
+import { client, engagement, engagementAssignment, invitation, membership, organization, recordMessage } from "./schema";
 import * as schema from "./schema";
 
 config({ path: [".env.local", ".env"], quiet: true });
@@ -139,6 +139,34 @@ async function main() {
   // Carol edits one Acme engagement and has read access to one Beacon engagement as a viewer.
   await assign(acme.id, odoo.id, carol, "edit");
   await assign(beacon.id, intake.id, carol, "read");
+
+  // Project Essentials, stages and some chatter (phase 02b). Only filled in when still empty, and
+  // chatter only added once, so re-running changes nothing.
+  await db
+    .update(engagement)
+    .set({
+      ocmStage: "develop",
+      startDate: "2026-09-01",
+      endDate: "2027-06-30",
+      objectives: "Move order-to-cash and procurement onto Odoo 18 without losing a month-end close.",
+      scopeSummary: "Sales, purchasing, inventory and accounting at the Manila and Cebu sites. Payroll is out of scope.",
+      successCriteria: "Month-end close in five working days by the second close after go-live.",
+      transitionOwner: "Harbour Foods finance operations",
+    })
+    .where(and(eq(engagement.id, odoo.id), isNull(engagement.objectives)));
+  const [existingNote] = await db.select({ id: recordMessage.id }).from(recordMessage).where(eq(recordMessage.resId, odoo.id)).limit(1);
+  if (!existingNote) {
+    const target = { orgId: acme.id, engagementId: odoo.id, resType: "engagement", resId: odoo.id } as const;
+    await db.insert(recordMessage).values([
+      { ...target, kind: "note", authorUserId: alice, body: "Kick-off held with the finance manager. Sponsor confirmed." },
+      {
+        ...target,
+        kind: "tracking",
+        authorUserId: carol,
+        tracking: [{ field: "ocmStage", label: "Stage", old: "Assess", new: "Develop" }],
+      },
+    ]);
+  }
 
   // A pending invitation, so the members page and the accept flow have something to show. The
   // token is stored only as a hash, so a re-run replaces the invitation and prints a fresh link.
