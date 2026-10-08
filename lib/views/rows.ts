@@ -1,5 +1,6 @@
 import { ENGAGEMENT_TYPE_LABELS, SIZE_BAND_LABELS, type EngagementType, type SizeBand } from "@/lib/validation/engagements";
 import { OCM_STAGE_LABELS, type OcmStage } from "./engagement";
+import { ANONYMITY_LABELS, INSTRUMENT_KIND_LABELS, INSTRUMENT_STATUS_LABELS, type InstrumentKind, type InstrumentStatus } from "./instrument";
 import type { RowData } from "./types";
 
 type EngagementRow = {
@@ -58,5 +59,40 @@ export function clientRows(rows: ClientRow[], orgSlug: string, context: string, 
       engagements: r.engagements,
     },
     group: groupBy === "industry" ? (r.industry ?? "") : groupBy === "size" ? (r.sizeBand ?? "") : undefined,
+  }));
+}
+
+type InstrumentRow = {
+  id: string;
+  name: string;
+  kind: InstrumentKind;
+  wave: number;
+  waveLabel: string | null;
+  status: InstrumentStatus;
+  anonymity: "anonymous" | "identified";
+  opensAt: Date | null;
+  closesAt: Date | null;
+  questions: number;
+};
+
+const utc = (d: Date | null) => (d ? `${d.toISOString().slice(0, 16).replace("T", " ")} UTC` : null);
+
+export function instrumentRows(rows: InstrumentRow[], base: string, context: string, groupBy: string | null, canMove: boolean): RowData[] {
+  return rows.map((r) => ({
+    id: r.id,
+    href: `${base}/${r.id}${context ? `?${context}` : ""}`,
+    cells: {
+      name: r.name,
+      kind: INSTRUMENT_KIND_LABELS[r.kind],
+      wave: r.waveLabel ? `${r.wave} · ${r.waveLabel}` : r.wave,
+      status: INSTRUMENT_STATUS_LABELS[r.status],
+      anonymity: ANONYMITY_LABELS[r.anonymity],
+      questions: r.questions,
+      opens: utc(r.opensAt),
+      closes: utc(r.closesAt),
+    },
+    stage: r.status,
+    group: groupBy === "kind" ? r.kind : groupBy === "status" ? r.status : undefined,
+    canMove,
   }));
 }

@@ -67,7 +67,14 @@ const optionsField = z.preprocess(
         return z.NEVER;
       }
     })
-    .pipe(z.array(z.object({ label: z.string().trim().min(1, "Every option needs a label.").max(200), value: z.coerce.number() })).max(20)),
+    .pipe(z
+        .array(
+          z.object({
+            label: z.string().trim().min(1, "Every option needs a label.").max(200),
+            value: z.preprocess(emptyToUndefined, z.coerce.number({ message: "Every option needs a score." })),
+          }),
+        )
+        .max(20, "Keep it to 20 options or fewer.")),
 );
 
 export const questionSchema = instrumentIdSchema

@@ -4,7 +4,21 @@ import { and, eq, isNull, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
 import { generateInvitationToken, hashInvitationToken, INVITATION_TTL_MS } from "../tokens/invitation";
-import { client, engagement, engagementAssignment, invitation, membership, organization, recordMessage } from "./schema";
+import { definitionSchema } from "../instruments/definition";
+import { TEMPLATE_VERSION } from "../instruments/readiness-templates";
+import { createInstrumentFromDefinition } from "./mutations/instruments";
+import {
+  client,
+  engagement,
+  engagementAssignment,
+  instrument,
+  instrumentTemplate,
+  invitation,
+  membership,
+  organization,
+  recordMessage,
+} from "./schema";
+import { syncSystemTemplates } from "./system-templates";
 import * as schema from "./schema";
 
 config({ path: [".env.local", ".env"], quiet: true });
@@ -166,6 +180,32 @@ async function main() {
         tracking: [{ field: "ocmStage", label: "Stage", old: "Assess", new: "Develop" }],
       },
     ]);
+  }
+
+  // A drafted readiness assessment on the Odoo rollout (phase 03), from the packaged-software
+  // template. The templates normally arrive with `pnpm db:migrate`; syncing here is a no-op then.
+  await syncSystemTemplates(db);
+  const [existingInstrument] = await db.select({ id: instrument.id }).from(instrument).where(eq(instrument.engagementId, odoo.id)).limit(1);
+  if (!existingInstrument) {
+    const [template] = await db
+      .select()
+      .from(instrumentTemplate)
+      .where(
+        and(
+          isNull(instrumentTemplate.orgId),
+          eq(instrumentTemplate.engagementType, "packaged_software"),
+          eq(instrumentTemplate.version, TEMPLATE_VERSION),
+        ),
+      );
+    if (!template) throw new Error("The packaged-software readiness template is missing.");
+    await db.transaction((tx) =>
+      createInstrumentFromDefinition(
+        tx,
+        { orgId: acme.id, engagementId: odoo.id },
+        { name: "Readiness assessment", kind: "readiness", templateId: template.id, createdBy: alice, waveLabel: "Baseline" },
+        definitionSchema.parse(template.definition),
+      ),
+    );
   }
 
   // A pending invitation, so the members page and the accept flow have something to show. The

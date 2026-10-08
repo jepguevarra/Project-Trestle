@@ -13,7 +13,7 @@ import { cn } from "@/lib/utils";
 export type FieldDef = {
   name: string;
   label: string;
-  kind: "text" | "textarea" | "date" | "select";
+  kind: "text" | "textarea" | "date" | "select" | "number" | "datetime";
   options?: { value: string; label: string }[];
   /** Shown but never editable (e.g. type for non-admins). */
   readOnly?: boolean;
@@ -80,6 +80,7 @@ export function RecordForm({
     const v = values[f.name] ?? "";
     if (!v) return <span className="text-muted-foreground">—</span>;
     if (f.kind === "select") return f.options?.find((o) => o.value === v)?.label ?? v;
+    if (f.kind === "datetime") return v.replace("T", " ");
     return <span className="whitespace-pre-wrap">{v}</span>;
   };
 
@@ -109,7 +110,7 @@ export function RecordForm({
       ) : (
         <Input
           {...common}
-          type={f.kind === "date" ? "date" : "text"}
+          type={f.kind === "date" ? "date" : f.kind === "datetime" ? "datetime-local" : f.kind === "number" ? "number" : "text"}
           value={values[f.name] ?? ""}
           placeholder={f.placeholder}
           onChange={(e) => set(e.target.value)}

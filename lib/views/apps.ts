@@ -20,7 +20,7 @@ export const ENGAGEMENT_APPS: AppDef[] = [
   { key: "checklist", label: "Checklist", section: "engagement", route: null, deliveredBy: "14" },
   { key: "settings", label: "Settings", section: "engagement", route: "settings", deliveredBy: "02b" },
 
-  { key: "readiness", label: "Readiness", section: "assess", route: null, deliveredBy: "03–05" },
+  { key: "readiness", label: "Readiness", section: "assess", route: "readiness", deliveredBy: "03–05" },
   { key: "audiences", label: "Audiences", section: "assess", route: null, deliveredBy: "07" },
   { key: "stakeholders", label: "Stakeholders", section: "assess", route: null, deliveredBy: "07" },
   { key: "impacts", label: "Impacts", section: "assess", route: null, deliveredBy: "08" },

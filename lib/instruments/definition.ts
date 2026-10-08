@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { CHOICE_TYPES, QUESTION_TYPES, SCORED_TYPES } from "./question-types";
 
 /**
  * The shape of `instrument_template.definition`: everything needed to create an instrument's
@@ -6,12 +7,7 @@ import { z } from "zod";
  * templates saved from a real instrument.
  */
 
-export const QUESTION_TYPES = ["likert_5", "likert_7", "single_choice", "multi_choice", "open_text", "numeric"] as const;
-export type QuestionType = (typeof QUESTION_TYPES)[number];
-
-/** Types that score into a dimension and therefore must name one. */
-export const SCORED_TYPES: readonly QuestionType[] = ["likert_5", "likert_7", "single_choice", "multi_choice"];
-export const CHOICE_TYPES: readonly QuestionType[] = ["single_choice", "multi_choice"];
+export { CHOICE_TYPES, QUESTION_TYPE_LABELS, QUESTION_TYPES, SCORED_TYPES, type QuestionType } from "./question-types";
 
 const option = z.object({ label: z.string().min(1).max(200), value: z.number() });
 
