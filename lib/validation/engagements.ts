@@ -83,3 +83,43 @@ export const createEngagementSchema = engagementDetailsSchema.extend({
 export const assignSchema = z.object({ userId: z.uuid("Pick a member."), access: z.enum(ACCESS_LEVELS) });
 export const unassignSchema = z.object({ userId: z.uuid() });
 export const emptySchema = z.object({});
+
+// ─── Phase 02b: the engagement form, stage, chatter, bulk actions ──────────────────────────────
+
+const longText = optional(z.string().trim().max(4000, "Keep it under 4,000 characters."));
+
+export const OCM_STAGE_VALUES = ["assess", "develop", "deploy", "normalize", "exit"] as const;
+
+/** Everything on the engagement form. `type` and `clientId` are applied only for admins. */
+export const engagementFormSchema = engagementDetailsSchema
+  .extend({
+    startDate: optional(z.iso.date("Enter a date.")),
+    endDate: optional(z.iso.date("Enter a date.")),
+    objectives: longText,
+    scopeSummary: longText,
+    successCriteria: longText,
+    transitionOwner: optional(z.string().trim().max(120)),
+    type: optional(z.enum(ENGAGEMENT_TYPES, "Pick the type of change.")),
+    clientId: optional(z.uuid("Pick a client.")),
+  })
+  .refine((v) => !v.startDate || !v.endDate || v.endDate >= v.startDate, {
+    path: ["endDate"],
+    message: "The end date is before the start date.",
+  });
+
+export const stageSchema = z.object({ stage: z.enum(OCM_STAGE_VALUES) });
+
+export const noteSchema = z.object({
+  body: z.string().trim().min(1, "Write something first.").max(5000, "Keep notes under 5,000 characters."),
+});
+export const clientNoteSchema = noteSchema.extend({ clientId: z.uuid() });
+
+/** Bulk actions from a list's selection. */
+export const bulkEngagementSchema = z.object({
+  op: z.enum(["archive", "reactivate"]),
+  ids: z
+    .string()
+    .transform((s) => s.split(",").filter(Boolean))
+    .pipe(z.array(z.uuid()).min(1, "Select at least one engagement.").max(200)),
+});
+

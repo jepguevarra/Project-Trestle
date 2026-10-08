@@ -13,25 +13,10 @@ const listColumns = {
   targetSystem: engagement.targetSystem,
   targetGoLive: engagement.targetGoLive,
   status: engagement.status,
+  ocmStage: engagement.ocmStage,
   clientId: client.id,
   clientName: client.name,
 };
-
-/** Engagements the user can see in the org with the given status. RLS applies the assignment scope. */
-export function listEngagements(tx: Tx, orgId: string, status: EngagementStatus, clientId?: string) {
-  return tx
-    .select(listColumns)
-    .from(engagement)
-    .innerJoin(client, and(eq(client.id, engagement.clientId), eq(client.orgId, engagement.orgId)))
-    .where(
-      and(
-        eq(engagement.orgId, orgId),
-        eq(engagement.status, status),
-        clientId ? eq(engagement.clientId, clientId) : undefined,
-      ),
-    )
-    .orderBy(asc(client.name), asc(engagement.name));
-}
 
 /** Every engagement of one client the user can see, active first. */
 export function listClientEngagements(tx: Tx, orgId: string, clientId: string) {
@@ -79,10 +64,22 @@ export async function listEngagementTeam(tx: Tx, orgId: string, engagementId: st
   return rows.map((r) => ({ userId: r.user_id, email: r.email, role: r.role, access: r.access }));
 }
 
-/** Recently touched active engagements, for the org dashboard. */
+/** Recently touched active engagements, for the org dashboard, shaped like list rows. */
 export function listRecentActiveEngagements(tx: Tx, orgId: string, limit = 8) {
   return tx
-    .select(listColumns)
+    .select({
+      id: engagement.id,
+      name: engagement.name,
+      clientName: client.name,
+      type: engagement.type,
+      targetSystem: engagement.targetSystem,
+      ocmStage: engagement.ocmStage,
+      targetGoLive: engagement.targetGoLive,
+      status: engagement.status,
+      startDate: engagement.startDate,
+      endDate: engagement.endDate,
+      access: sql<"edit" | "read" | null>`private.engagement_access(${engagement.id})`,
+    })
     .from(engagement)
     .innerJoin(client, and(eq(client.id, engagement.clientId), eq(client.orgId, engagement.orgId)))
     .where(and(eq(engagement.orgId, orgId), eq(engagement.status, "active")))
