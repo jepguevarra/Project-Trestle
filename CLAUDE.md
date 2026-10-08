@@ -31,15 +31,16 @@ resourcing or sprints. Every feature must be defensible as "a consultant would b
 
 ## Current state
 
-Phases 01 (foundations), 02 (clients and engagements), 02b (view kit) and 03 (instrument engine) are built. Each phase file ends with its
+Phases 01 (foundations), 02 (clients and engagements), 02b (view kit), 03 (instrument engine) and 04 (distribution and response) are built. Each phase file ends with its
 build notes and acceptance status. `docs/plan/` holds the build order: phases 01–20 plus 02b, run in
 the order given by the index in `docs/plan/README.md`, not by number. **Do not skip ahead.** Each
 phase depends on the schema and primitives of the ones before it.
 
-Next is `docs/plan/phase-04-distribution-response.md`. Build its screens from the view kit
+Next is `docs/plan/phase-05-scoring-report.md`. Build its screens from the view kit
 (`components/views/`, `lib/views/`); `phase-02b-view-kit.md`'s build notes say how a model plugs in.
-The respondent page must reuse `components/survey/respondent-form.tsx`, which phase 03 built for
-the preview. The readiness item wording in `docs/READINESS-INSTRUMENT.md` is a draft awaiting review.
+Responses carry `submission_id` for per-person checks on anonymous instruments; read only
+`response`, never `response_draft`. The readiness item wording in `docs/READINESS-INSTRUMENT.md` is a
+draft awaiting review.
 Phase 05 is the first sellable point. Phases 01–05 are the capstone's minimum evaluation target.
 
 Tenant queries run inside `withRls` (`lib/db`), which switches to Supabase's `authenticated` role
@@ -134,8 +135,9 @@ pnpm db:studio        # drizzle studio
 3. The **service-role key never reaches the browser** and never appears in a Client Component.
    It is used only inside route handlers under `app/api/public/**`.
 4. Anonymous survey respondents **never talk to Supabase directly.** They hit a Next.js route
-   handler that validates a signed, single-purpose token and then writes with the service role.
-   See `docs/DATA-MODEL.md` § Anonymous respondent path.
+   handler that validates a signed, single-purpose token and then writes as the narrow
+   `trestle_survey` role (phase 04: RLS still applies, scoped to that token's respondent; the
+   service role is not used). See `docs/DATA-MODEL.md` § Anonymous respondent path.
 5. Assessment responses are the most sensitive data in the product — employees saying their
    leadership is unprepared. Respect the per-instrument anonymity setting everywhere, including
    in exports and in any aggregate that could be de-anonymised by small-n filtering. Minimum

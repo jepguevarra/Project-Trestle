@@ -70,7 +70,7 @@ app/
       settings/                members, invitations, templates, channels, library, branding
   api/
     public/
-      survey/[token]/route.ts  anonymous respondent read + submit (service role)
+      survey/[token]/route.ts  anonymous respondent read + submit (trestle_survey role)
     exports/[kind]/route.ts    PDF / DOCX generation
     webhooks/
 components/
@@ -114,12 +114,15 @@ Engagement pages use `requireEngagementAccess` and engagement-scoped actions use
 `engagementAction` (`lib/auth/engagement.ts`): no access is a 404, and an archived engagement is
 read-only.
 
-**Anonymous respondent.** Browser → `app/api/public/survey/[token]` → verify signed token →
-service-role Supabase client → write scoped strictly to that respondent's row. RLS is bypassed
-here by necessity, which is exactly why this is the only place the service role appears and why
-every write in it is narrowed by the token's claims. Token claims: `respondent_id`,
-`instance_id`, `exp`. Tokens are single-instrument, expire at the instrument close date, and are
-revoked by rotating a per-instance secret.
+**Anonymous respondent.** Browser → `/survey/[token]` (a page shell; middleware skips it, so there
+is no Supabase call) → `app/api/public/survey/[token]` → verify the signed token → a transaction as
+the `trestle_survey` Postgres role with the token's respondent and instrument set as
+transaction-local settings → RLS and column grants limit it to that respondent's row and drafts and
+that instrument's questions → submit through `private.submit_survey()`. Supabase's service-role key
+is not used: the route has a role narrower than any signed-in user's, not a broader one. Token claims:
+`respondent_id`, `instrument_id`, `token_version`, the instrument's `token_epoch`, `exp`. Tokens are
+single-instrument, expire at the instrument's close date, and are revoked by bumping the epoch
+(DATA-MODEL.md §12).
 
 **Exports.** Server-rendered in a route handler under the user's session, so RLS still applies.
 Generated files stream back directly; nothing is persisted to storage in v1 unless a phase says

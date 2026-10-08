@@ -26,7 +26,7 @@ docs cite; the OCM lifecycle (`OCM-MODULE.md`, October 2026) added 02b and 13–
 | 2 | 02 | Clients and engagements ✓ | Client and engagement records with `type`, assignment, the app shell | 01 |
 | 3 | **02b** | **View kit and Project Essentials** ✓ | The Odoo-style shell: apps, control panel, list/kanban/form, statusbar, smart buttons, chatter; engagement stage and essentials | 02 |
 | 4 | 03 | Instrument engine ✓ | Instruments, dimensions, sections, questions, templates; full `kind` enum and `wave` | 02b |
-| 5 | 04 | Distribution and response | Respondents, signed tokens, the public survey page, nudges | 03 |
+| 5 | 04 | Distribution and response ✓ | Respondents, signed tokens, the public survey page, nudges | 03 |
 | 6 | 05 | Scoring and report | Scoring functions, dashboard, consensus, perception gap, alpha, export | 04 |
 | 7 | **14** | **Checklist and RACI** | Task templates, the shipped OCM checklist, phase progress, RACI | 02b |
 | 8 | 06 | The evidence spine | Elicitation sources, extracts, attachments, the elicitation log | 02 |

@@ -4,9 +4,9 @@ A workspace for implementation partners and functional consultants: readiness as
 stakeholder mapping, change impact and process documentation for a client preparing for a new
 system, linked in one engagement. See [`docs/PRD.md`](docs/PRD.md).
 
-**Status:** phases 01, 02, 02b and 03 of [`docs/plan/`](docs/plan/README.md): auth and
+**Status:** phases 01, 02, 02b, 03 and 04 of [`docs/plan/`](docs/plan/README.md): auth and
 organisations, clients and engagements, the Odoo-style view kit, and the instrument engine (readiness
-assessments built from templates, with a builder and a respondent preview).
+assessments built from templates, with a builder and a respondent preview), and distribution (respondent lists, emailed survey links, a public survey page that works on a phone, reminders, anonymous submission).
 
 ## Stack
 

@@ -81,7 +81,7 @@ instrument_template     reusable definition, not tied to an engagement
 instrument              a live run inside one engagement
   id, org_id, engagement_id, template_id (nullable), name, kind,
   wave (smallint, default 1), wave_label,
-  anonymity, opens_at, closes_at, status, created_by
+  anonymity, opens_at, closes_at, status, token_epoch (phase 04), created_by
   kind:      readiness | sponsor | pulse | go_live_adoption | post_go_live_adoption
            | training_feedback | champion | coaching | communication_feedback | custom
   anonymity: identified | anonymous
@@ -113,7 +113,8 @@ question_option         for choice types
 
 **No `token_secret` on `instrument`** (changed in phase 03). Everything on `instrument` is readable
 by everyone on the engagement, a client-side viewer included, so the link-signing secret cannot live
-here. Phase 04 stores it where only the service-role route handler can read it.
+here. Phase 04 signs links with a key from the server environment and keeps only a link version,
+`token_epoch`, on the instrument (§12).
 
 **Status rules, enforced by a trigger** (`private.guard_instrument`): draft → open needs at least
 one question (TR422); open ↔ closed is allowed; nothing goes back to draft, and draft cannot jump to
@@ -145,20 +146,38 @@ inverts a dimension score, and reverse-worded items are how straight-lining is d
 
 ```
 respondent
-  id, org_id, instrument_id, name, email, department, role_title, seniority,
-  person_id (nullable), org_unit_id (nullable),            -- phase 07
+  id, org_id, engagement_id, instrument_id, name, email (lower-case), department, role_title,
+  seniority, person_id (nullable), org_unit_id (nullable),   -- the last two arrive in phase 07
   invited_at, reminded_at, completed_at, token_version
   seniority: frontline | supervisor | manager | executive
   unique (instrument_id, email)
 
-response
-  id, org_id, instrument_id, question_id,
-  respondent_id (nullable — see below),
+response                submitted answers only
+  id, org_id, engagement_id, instrument_id, question_id,
+  option_id (choice questions: one row per selected option, value_numeric = the option's score),
+  submission_id (groups one submission without naming who made it),
+  respondent_id (nullable: never written on an anonymous instrument),
   department, role_title, seniority, org_unit_id,          -- denormalised at submit time
-  value_numeric, value_text, answered_at
+  value_numeric, value_text,
+  answered_at (nullable: never written on an anonymous instrument)
   index (instrument_id, question_id)
   index (org_id)
+
+response_draft          answers before submit, so a respondent can leave and resume
+  id, org_id, engagement_id, instrument_id, respondent_id, question_id,
+  value_numeric, value_text, option_ids uuid[]
+  unique (respondent_id, question_id)
+  -- unreadable to every signed-in user; deleted on submit
 ```
+
+**As built (phase 04).** Three changes from the first sketch. Unsubmitted answers live in
+`response_draft`, not `response`, so consultants never see partial answers and `response` only ever
+holds submitted data. `submission_id` lets reliability and straight-lining checks (phase 05) group a
+person's answers on an anonymous instrument without knowing who they are. And on an anonymous
+instrument `answered_at` is null as well as `respondent_id`: a timestamp next to each answer could be
+matched to `respondent.completed_at`, which is exactly the careless report query this design exists
+to survive. Rows are still physically written together; a deliberate attacker with database access
+could use that, and nothing in the app reads `response` in insertion order.
 
 ### Why segment attributes are copied onto `response`
 
@@ -172,18 +191,21 @@ answers on submit. Readiness per org unit is a segment like any other, so n ≥ 
 
 ### The anonymity mechanism
 
-| Instrument | `response.respondent_id` | `respondent.completed_at` |
-|---|---|---|
-| `identified` | set, kept | set |
-| `anonymous` | set during submit, **nulled in the same transaction once all rows are written** | set |
+| Instrument | `response.respondent_id` | `response.answered_at` | `respondent.completed_at` |
+|---|---|---|---|
+| `identified` | set | set | set |
+| `anonymous` | **never written** | **never written** | set |
 
 Completion tracking and reminders keep working, because they read `respondent.completed_at`. The link
-from an answer to a person is gone from the database — not hidden by a query, not filtered by a
-policy, gone. This is the only design that survives someone later writing a careless report query.
+from an answer to a person is never in the database: not hidden by a query, not filtered by a policy,
+never written.
 
-Write it as a single transaction in the public route handler: insert all responses, set
-`completed_at`, then `update response set respondent_id = null where respondent_id = $1` when the
-instrument is anonymous.
+**As built (phase 04).** The submit is one function, `private.submit_survey()` (`drizzle/0004`), so it
+cannot be half-done: it checks the survey is open and every required question has a valid answer,
+copies the drafts into `response` with the respondent's segment attributes (inserting null
+`respondent_id` and `answered_at` when anonymous, rather than writing and then clearing them), sets
+`completed_at` and deletes the drafts. Anonymity is fixed once an instrument opens (§2), so the
+setting a respondent was shown is the one their answers are stored under.
 
 ### Small-n suppression
 
@@ -584,20 +606,33 @@ engagements are read-only to non-admins in RLS too.
 
 ### The anonymous respondent path
 
-The only place the service role appears. `app/api/public/survey/[token]/route.ts`:
+The only code that acts for someone with no account. `app/api/public/survey/[token]/route.ts`:
 
-1. Verify the signed token. Claims: `respondent_id`, `instrument_id`, `token_version`, `exp`.
-2. Reject if `instrument.status <> 'open'`, if `now() > closes_at`, or if the token's
-   `token_version` does not match the respondent's current one.
+1. Verify the signed token. Claims: `r` (respondent_id), `i` (instrument_id), `v`
+   (respondent.token_version), `e` (instrument.token_epoch), `exp`.
+2. Reject if the respondent is not on that instrument, if either version is stale, if the instrument is
+   not open or is past `closes_at`, or (for writes) if the respondent has already submitted.
 3. Read **only** that instrument's questions and that respondent's own draft answers.
-4. Write **only** rows whose `respondent_id` matches the token claim.
-5. On final submit, in one transaction: write responses with segment attributes denormalised, set
-   `respondent.completed_at`, and null `respondent_id` on those responses when the instrument is
-   anonymous.
+4. Write **only** drafts whose `respondent_id` matches the token claim.
+5. On final submit, call `private.submit_survey()` (§3).
 
-Tokens are single-instrument and expire at the instrument's close date. Rotating the instrument's
-token secret revokes every outstanding link at once. The secret is not a column on `instrument`
-(§2): phase 04 keeps it where only the service-role handler can read it.
+**As built (phase 04): a narrow role, not the service role.** Rather than bypass RLS, the route runs
+as `trestle_survey` (`lib/db/survey.ts`): after verifying the signature it opens a transaction, sets
+`trestle.respondent_id` and `trestle.instrument_id` from the token as transaction-local settings, and
+switches role. That role's policies read those settings, so steps 3 and 4 are enforced by Postgres,
+not just by the route's code. Column grants keep scoring out of its reach: it cannot read dimensions,
+question weights, reverse flags, item sources, option scores, emails, other respondents, or any
+`response` row. Supabase's `service_role` key is not used anywhere in the product.
+
+Tokens are HMAC-SHA256 signed with `SURVEY_TOKEN_SECRET` (server environment; derived from
+`DATABASE_URL` when unset) and expire at the instrument's close date, or 90 days after sending when it
+has none. Bumping `instrument.token_epoch` ("Revoke links") revokes every outstanding link at once;
+changing a respondent's email bumps their `token_version` (a trigger), revoking the link sent to the
+old address. The secret is never in the database (§2).
+
+Respondent policies for signed-in users: read with the engagement; editors add, change and remove
+respondents while the instrument is a draft or open; someone who has submitted cannot be removed;
+`completed_at` can be set only by the submit function.
 
 ### The test that must never be skipped
 

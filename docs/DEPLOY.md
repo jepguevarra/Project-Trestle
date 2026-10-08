@@ -62,6 +62,7 @@ APP_URL='https://<staging url>' pnpm db:seed
 | `EMAIL_DELIVERY` | `console` (links appear in Vercel's runtime logs) or `resend` | `resend` (required) |
 | `RESEND_API_KEY` | only if `resend` | required |
 | `APP_URL` | leave unset: derived from the preview's branch URL | `https://<production domain>` |
+| `SURVEY_TOKEN_SECRET` | optional | recommended: `openssl rand -base64 32`. Signs survey links; changing it revokes every link already sent. Unset, it is derived from `DATABASE_URL` |
 
 Keep **Automatically expose System Environment Variables** on (the default); previews read
 `VERCEL_BRANCH_URL` from it.
