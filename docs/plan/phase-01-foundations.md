@@ -83,6 +83,8 @@ Approved by the product owner, along with the dependencies added in this phase (
 - A signed-in user with no org lands on `/welcome` to create one; the org switcher links there too.
 - Re-inviting an existing member is refused; accepting an invitation when already a member keeps
   the existing role.
+- Viewers can open the Members page and see the firm's roster (confirmed by the product owner,
+  October 2026). Only admins and owners can invite, change roles or remove.
 
 ## Acceptance status
 
