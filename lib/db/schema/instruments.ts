@@ -87,6 +87,11 @@ export const instrument = pgTable(
     opensAt: timestamp("opens_at", { withTimezone: true }),
     closesAt: timestamp("closes_at", { withTimezone: true }),
     status: instrumentStatus("status").notNull().default("draft"),
+    /**
+     * Survey link version. Every respondent link carries it; bumping it revokes every link sent so
+     * far (phase 04). Not a secret: the signing key lives in the server environment.
+     */
+    tokenEpoch: integer("token_epoch").notNull().default(1),
     createdBy: uuid("created_by").references(() => authUsers.id, { onDelete: "set null" }),
     ...timestamps,
   },

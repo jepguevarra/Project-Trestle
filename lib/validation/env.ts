@@ -16,6 +16,9 @@ export const envSchema = z
     EMAIL_DELIVERY: z.enum(["resend", "console"]).default("resend"),
     EMAIL_FROM: z.string().min(3),
     RESEND_API_KEY: z.preprocess(emptyToUndefined, z.string().min(1).optional()),
+    // Signs survey links. Optional: without it the key is derived from DATABASE_URL (which holds the
+    // database password), so changing either one revokes every outstanding survey link.
+    SURVEY_TOKEN_SECRET: z.preprocess(emptyToUndefined, z.string().min(32, "Use at least 32 characters.").optional()),
   })
   .refine((e) => e.EMAIL_DELIVERY !== "resend" || e.RESEND_API_KEY !== undefined, {
     message: "RESEND_API_KEY is required when EMAIL_DELIVERY=resend",
