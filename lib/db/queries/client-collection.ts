@@ -3,11 +3,13 @@ import type { ViewParams } from "@/lib/views/params";
 import type { GroupData } from "@/lib/views/types";
 import { SIZE_BAND_LABELS, type SizeBand } from "@/lib/validation/engagements";
 import type { Tx } from "../rls";
-import { client, engagement } from "../schema";
+import { client } from "../schema";
 import { facetWhere, orderClause } from "./collection";
 
 // Engagements per client that the user can see: the subquery runs under engagement's RLS.
-const engagementCount = sql<number>`(select count(*)::int from ${engagement} e where e.client_id = ${client.id} and e.org_id = ${client.orgId})`;
+// Written out in full: inside a single-table select Drizzle renders ${client.id} as a bare "id",
+// which the subquery would resolve to e.id (and the count would always be 0).
+const engagementCount = sql<number>`(select count(*)::int from public.engagement e where e.client_id = "client"."id" and e.org_id = "client"."org_id")`;
 
 const columns = { name: client.name, industry: client.industry, size: client.sizeBand, engagements: engagementCount };
 const facetColumns = { name: client.name, industry: client.industry };

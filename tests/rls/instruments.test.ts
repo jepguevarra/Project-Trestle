@@ -2,6 +2,11 @@ import { and, eq, isNull } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { READINESS_TEMPLATES } from "@/lib/instruments/readiness-templates";
 import { createInstrumentFromDefinition } from "@/lib/db/mutations/instruments";
+import { queryClients } from "@/lib/db/queries/client-collection";
+import { findInstrument, queryInstruments } from "@/lib/db/queries/instruments";
+import { clientModel } from "@/lib/views/client";
+import { instrumentModel } from "@/lib/views/instrument";
+import { parseViewParams } from "@/lib/views/params";
 import {
   client,
   dimension,
@@ -246,5 +251,22 @@ describe("integrity", () => {
 
     await asUser(h.db, t.userA, (tx) => tx.delete(instrument).where(and(eq(instrument.id, a.instrumentId), eq(instrument.status, "draft"))));
     expect(await h.db.select().from(recordMessage).where(eq(recordMessage.resId, a.instrumentId))).toHaveLength(0);
+  });
+});
+
+describe("list counts", () => {
+  // Regression: a correlated subquery written with ${table.column} rendered as a bare "id" and
+  // resolved to the subquery's own table, so every count read 0.
+  it("an instrument's question count and a client's engagement count are real", async () => {
+    const a = await setup(t.orgA.id);
+    const expected = definition.sections.flatMap((s) => s.questions).length;
+    const view = parseViewParams({}, instrumentModel);
+    const { rows } = await asUser(h.db, t.userA, (tx) => queryInstruments(tx, t.orgA.id, a.engagement.id, view));
+    expect(rows.find((r) => r.id === a.instrumentId)?.questions).toBe(expected);
+    const found = await asUser(h.db, t.userA, (tx) => findInstrument(tx, t.orgA.id, a.engagement.id, a.instrumentId));
+    expect(found?.questions).toBe(expected);
+
+    const clients = await asUser(h.db, t.userA, (tx) => queryClients(tx, t.orgA.id, parseViewParams({}, clientModel)));
+    expect(clients.rows.find((r) => r.id === a.engagement.clientId)?.engagements).toBe(1);
   });
 });

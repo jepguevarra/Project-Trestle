@@ -9,7 +9,9 @@ import { facetWhere, filterWhere, orderClause } from "./collection";
 
 export type Instrument = typeof instrument.$inferSelect;
 
-const questionCount = sql<number>`(select count(*)::int from ${question} q where q.instrument_id = ${instrument.id})`;
+// Written out in full: inside a single-table select Drizzle renders ${instrument.id} as a bare
+// "id", which the subquery would resolve to q.id.
+const questionCount = sql<number>`(select count(*)::int from public.question q where q.instrument_id = "instrument"."id")`;
 
 const columns = {
   name: instrument.name,
