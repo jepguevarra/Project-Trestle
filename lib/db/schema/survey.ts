@@ -77,8 +77,11 @@ export const response = pgTable(
     valueNumeric: numeric("value_numeric", { mode: "number" }),
     valueText: text("value_text"),
     answeredAt: timestamp("answered_at", { withTimezone: true }),
+    /** Seconds from the first saved answer to submit; the same on every row of a submission. For the speeding flag. */
+    durationSeconds: integer("duration_seconds"),
   },
   (t) => [
+    unique("response_id_instrument_id_key").on(t.id, t.instrumentId),
     index("response_org_id_idx").on(t.orgId),
     index("response_instrument_id_question_id_idx").on(t.instrumentId, t.questionId),
     index("response_instrument_id_engagement_id_org_id_idx").on(t.instrumentId, t.engagementId, t.orgId),

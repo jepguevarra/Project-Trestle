@@ -36,6 +36,13 @@
       "when": 1791441425962,
       "tag": "0004_survey_distribution",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1791823827183,
+      "tag": "0005_scoring_report",
+      "breakpoints": true
     }
   ]
 }
