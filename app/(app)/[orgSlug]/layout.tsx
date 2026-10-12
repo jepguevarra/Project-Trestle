@@ -32,7 +32,7 @@ export default async function OrgLayout({ children, params }: { children: ReactN
               Clients
             </Link>
             <Link href={`${base}/settings/members` as never} className="rounded-md px-2 py-1 hover:bg-muted">
-              Members
+              Settings
             </Link>
           </nav>
           <div className="ml-auto flex items-center gap-3 text-sm">

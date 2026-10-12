@@ -80,6 +80,11 @@ export default async function InstrumentPage({
           <Link href={`${base}/${inst.id}/preview` as never} className={buttonVariants({ variant: "outline", size: "sm" })}>
             Preview
           </Link>
+          {!isDraft ? (
+            <Link href={`${base}/${inst.id}/results` as never} className={buttonVariants({ variant: "outline", size: "sm" })}>
+              Results
+            </Link>
+          ) : null}
           {canEdit && inst.status === "open" && counts.invited > counts.completed ? (
             <ActionButton
               action={bind(sendReminders)}

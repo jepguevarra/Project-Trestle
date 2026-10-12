@@ -19,6 +19,7 @@ import {
   recordMessage,
   respondent,
 } from "./schema";
+import { BASELINE_NAME, seedBaseline } from "./seed-responses";
 import { syncSystemTemplates } from "./system-templates";
 import * as schema from "./schema";
 
@@ -183,36 +184,34 @@ async function main() {
     ]);
   }
 
-  // A drafted readiness assessment on the Odoo rollout (phase 03), from the packaged-software
-  // template. The templates normally arrive with `pnpm db:migrate`; syncing here is a no-op then.
+  // Readiness on the Odoo rollout, from the packaged-software template (phases 03 to 05): a closed
+  // baseline with thirty anonymous submissions to report on, and a second wave still in draft with
+  // people ready to invite. The templates normally arrive with `pnpm db:migrate`; syncing here is a
+  // no-op then.
   await syncSystemTemplates(db);
-  const [existingInstrument] = await db.select({ id: instrument.id }).from(instrument).where(eq(instrument.engagementId, odoo.id)).limit(1);
-  if (!existingInstrument) {
-    const [template] = await db
-      .select()
-      .from(instrumentTemplate)
-      .where(
-        and(
-          isNull(instrumentTemplate.orgId),
-          eq(instrumentTemplate.engagementType, "packaged_software"),
-          eq(instrumentTemplate.version, TEMPLATE_VERSION),
-        ),
-      );
-    if (!template) throw new Error("The packaged-software readiness template is missing.");
-    await db.transaction((tx) =>
+  const [template] = await db
+    .select()
+    .from(instrumentTemplate)
+    .where(and(isNull(instrumentTemplate.orgId), eq(instrumentTemplate.engagementType, "packaged_software"), eq(instrumentTemplate.version, TEMPLATE_VERSION)));
+  if (!template) throw new Error("The packaged-software readiness template is missing.");
+  const definition = definitionSchema.parse(template.definition);
+  const findOnOdoo = async (name: string) =>
+    (await db.select({ id: instrument.id }).from(instrument).where(and(eq(instrument.engagementId, odoo.id), eq(instrument.name, name))).limit(1))[0];
+
+  if (!(await findOnOdoo(BASELINE_NAME))) {
+    await seedBaseline(db, { orgId: acme.id, engagementId: odoo.id, templateId: template.id, createdBy: alice, definition });
+  }
+
+  if (!(await findOnOdoo("Pre-go-live readiness"))) {
+    const draft = await db.transaction((tx) =>
       createInstrumentFromDefinition(
         tx,
         { orgId: acme.id, engagementId: odoo.id },
-        { name: "Readiness assessment", kind: "readiness", templateId: template.id, createdBy: alice, waveLabel: "Baseline" },
-        definitionSchema.parse(template.definition),
+        { name: "Pre-go-live readiness", kind: "readiness", templateId: template.id, createdBy: alice, wave: 2, waveLabel: "Pre-go-live" },
+        definition,
       ),
     );
-  }
-
-  // People to ask (phase 04): the Odoo rollout's assessment is a draft, so nobody is emailed until a
-  // consultant opens it. Addresses are on a reserved test domain.
-  const [seededInstrument] = await db.select({ id: instrument.id }).from(instrument).where(eq(instrument.engagementId, odoo.id)).limit(1);
-  if (seededInstrument) {
+    // Nobody is emailed until a consultant opens it. Addresses are on a reserved test domain.
     const people = [
       ["Grace Okafor", "Finance", "AP clerk", "frontline"],
       ["Tom Reyes", "Finance", "Finance manager", "manager"],
@@ -223,21 +222,18 @@ async function main() {
       ["Ade Bello", "Sales", "Sales coordinator", "frontline"],
       ["Ruth Kaplan", "Operations", "Operations director", "executive"],
     ] as const;
-    await db
-      .insert(respondent)
-      .values(
-        people.map(([name, department, roleTitle, seniority]) => ({
-          orgId: acme.id,
-          engagementId: odoo.id,
-          instrumentId: seededInstrument.id,
-          name,
-          email: `${name.split(" ")[0]!.toLowerCase()}@harbourfoods.test`,
-          department,
-          roleTitle,
-          seniority,
-        })),
-      )
-      .onConflictDoNothing();
+    await db.insert(respondent).values(
+      people.map(([name, department, roleTitle, seniority]) => ({
+        orgId: acme.id,
+        engagementId: odoo.id,
+        instrumentId: draft.id,
+        name,
+        email: `${name.split(" ")[0]!.toLowerCase()}@harbourfoods.test`,
+        department,
+        roleTitle,
+        seniority,
+      })),
+    );
   }
 
   // A pending invitation, so the members page and the accept flow have something to show. The

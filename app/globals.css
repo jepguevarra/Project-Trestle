@@ -16,6 +16,10 @@
   --success: oklch(0.52 0.12 155);
   --ring: oklch(0.55 0.1 245);
   --radius: 0.375rem;
+  /* Charts (DASHBOARD.md §3): one accent per series; a lighter step of the same hue for a second. */
+  --chart-1: #2f5b73;
+  --chart-2: #93b4c6;
+  --chart-grid: oklch(0.9 0.005 250);
 }
 
 @media (prefers-color-scheme: dark) {
@@ -32,6 +36,9 @@
     --destructive: oklch(0.65 0.18 27);
     --success: oklch(0.7 0.13 155);
     --ring: oklch(0.72 0.09 245);
+    --chart-1: #81b2ca;
+    --chart-2: #497689;
+    --chart-grid: oklch(0.3 0.01 250);
   }
 }
 

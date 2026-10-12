@@ -1,6 +1,11 @@
 import { expect, type Page } from "@playwright/test";
 import { config } from "dotenv";
+import { inflateSync } from "node:zlib";
+import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
+import { definitionSchema } from "../../lib/instruments/definition";
+import * as schema from "../../lib/db/schema";
+import { seedBaseline } from "../../lib/db/seed-responses";
 import { deriveSurveyKey, mintSurveyToken } from "../../lib/tokens/survey";
 
 config({ path: [".env.local", ".env"], quiet: true });
@@ -141,4 +146,49 @@ export async function surveyLink(instrumentId: string, email: string, opts: { ex
   const key = deriveSurveyKey(process.env.SURVEY_TOKEN_SECRET || undefined, process.env.DATABASE_URL!);
   const token = mintSurveyToken({ r, i: opts.claimInstrument ?? instrumentId, v, e, exp: opts.exp ?? Math.floor(Date.now() / 1000) + 3600 }, key);
   return `/survey/${token}`;
+}
+
+/**
+ * The seed's closed baseline (thirty submissions through the real survey path) on an engagement of
+ * the caller's own org, so results tests start from known data without depending on `pnpm db:seed`.
+ */
+export async function seedBaselineFor(engagementId: string, ownerEmail: string) {
+  const url = process.env.DATABASE_URL!;
+  const sql = postgres(url, { max: 1, onnotice: () => {} });
+  try {
+    const db = drizzle(sql, { schema });
+    const [ctx] = await sql<{ org: string; user: string; template: string; definition: unknown }[]>`
+      select e.org_id as org, u.id as user, t.id as template, t.definition
+      from engagement e, auth.users u, instrument_template t
+      where e.id = ${engagementId} and u.email = ${ownerEmail}
+        and t.org_id is null and t.engagement_type = 'packaged_software' order by t.version desc limit 1`;
+    return await seedBaseline(db, {
+      orgId: ctx!.org,
+      engagementId,
+      templateId: ctx!.template,
+      createdBy: ctx!.user,
+      definition: definitionSchema.parse(ctx!.definition),
+    });
+  } finally {
+    await sql.end();
+  }
+}
+
+/** The text drawn on a PDF's pages: inflates each stream and decodes the strings it shows. */
+export function pdfText(pdf: Buffer): string {
+  const out: string[] = [];
+  const raw = pdf.toString("latin1");
+  for (const m of raw.matchAll(/stream\r?\n/g)) {
+    const start = m.index! + m[0].length;
+    const end = raw.indexOf("endstream", start);
+    try {
+      const body = inflateSync(pdf.subarray(start, end)).toString("latin1");
+      for (const t of body.matchAll(/<([0-9a-fA-F]+)>|\(((?:\\.|[^\\)])*)\)/g)) {
+        out.push(t[1] ? Buffer.from(t[1], "hex").toString("latin1") : t[2]!.replace(/\\(.)/g, "$1"));
+      }
+    } catch {
+      // Not a deflated stream (an image, say).
+    }
+  }
+  return out.join("");
 }

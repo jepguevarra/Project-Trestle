@@ -148,14 +148,51 @@ ALTER TABLE public.report_narrative ENABLE ROW LEVEL SECURITY;--> statement-brea
 ALTER TABLE public.response_theme ENABLE ROW LEVEL SECURITY;--> statement-breakpoint
 ALTER TABLE public.org_branding ENABLE ROW LEVEL SECURITY;--> statement-breakpoint
 
+-- ─── Faster engagement-scoped reads ───────────────────────────────────────────────────────────
+-- `private.can_read_engagement(org_id, engagement_id)` is correlated: Postgres calls it once per row,
+-- and once per row *per join loop*, so joining 800 answers to their questions cost 2.7 seconds.
+-- The set of engagements a user may read is the same for every row of a query, so policies now ask
+-- `engagement_id IN (SELECT private.readable_engagement_ids())`: an uncorrelated subquery that runs
+-- once and is probed as a hash. Same rule as can_read_engagement: an admin of the org, or a member
+-- assigned to the engagement.
+CREATE FUNCTION private.readable_engagement_ids() RETURNS SETOF uuid
+LANGUAGE sql STABLE SECURITY DEFINER SET search_path = '' AS $$
+  SELECT e.id FROM public.engagement e
+  WHERE e.org_id IN (SELECT private.user_org_ids())
+    AND (private.has_org_role(e.org_id, 'admin') OR e.id IN (SELECT private.assigned_engagement_ids()))
+$$;--> statement-breakpoint
+REVOKE ALL ON FUNCTION private.readable_engagement_ids() FROM PUBLIC;--> statement-breakpoint
+GRANT EXECUTE ON FUNCTION private.readable_engagement_ids() TO authenticated;--> statement-breakpoint
+DROP POLICY scoped_select ON public.instrument;--> statement-breakpoint
+CREATE POLICY scoped_select ON public.instrument FOR SELECT TO authenticated
+  USING (org_id IN (SELECT private.user_org_ids()) AND engagement_id IN (SELECT private.readable_engagement_ids()));--> statement-breakpoint
+DROP POLICY scoped_select ON public.dimension;--> statement-breakpoint
+CREATE POLICY scoped_select ON public.dimension FOR SELECT TO authenticated
+  USING (org_id IN (SELECT private.user_org_ids()) AND engagement_id IN (SELECT private.readable_engagement_ids()));--> statement-breakpoint
+DROP POLICY scoped_select ON public.section;--> statement-breakpoint
+CREATE POLICY scoped_select ON public.section FOR SELECT TO authenticated
+  USING (org_id IN (SELECT private.user_org_ids()) AND engagement_id IN (SELECT private.readable_engagement_ids()));--> statement-breakpoint
+DROP POLICY scoped_select ON public.question;--> statement-breakpoint
+CREATE POLICY scoped_select ON public.question FOR SELECT TO authenticated
+  USING (org_id IN (SELECT private.user_org_ids()) AND engagement_id IN (SELECT private.readable_engagement_ids()));--> statement-breakpoint
+DROP POLICY scoped_select ON public.question_option;--> statement-breakpoint
+CREATE POLICY scoped_select ON public.question_option FOR SELECT TO authenticated
+  USING (org_id IN (SELECT private.user_org_ids()) AND engagement_id IN (SELECT private.readable_engagement_ids()));--> statement-breakpoint
+DROP POLICY scoped_select ON public.respondent;--> statement-breakpoint
+CREATE POLICY scoped_select ON public.respondent FOR SELECT TO authenticated
+  USING (org_id IN (SELECT private.user_org_ids()) AND engagement_id IN (SELECT private.readable_engagement_ids()));--> statement-breakpoint
+DROP POLICY scoped_select ON public.response;--> statement-breakpoint
+CREATE POLICY scoped_select ON public.response FOR SELECT TO authenticated
+  USING (org_id IN (SELECT private.user_org_ids()) AND engagement_id IN (SELECT private.readable_engagement_ids()));--> statement-breakpoint
+
 -- Narrative and themes: read with the engagement, written by whoever may edit it.
 CREATE POLICY scoped_select ON public.report_narrative FOR SELECT TO authenticated
-  USING (private.can_read_engagement(org_id, engagement_id));--> statement-breakpoint
+  USING (org_id IN (SELECT private.user_org_ids()) AND engagement_id IN (SELECT private.readable_engagement_ids()));--> statement-breakpoint
 CREATE POLICY editor_write ON public.report_narrative FOR ALL TO authenticated
   USING (private.can_edit_engagement(engagement_id))
   WITH CHECK (private.can_edit_engagement(engagement_id));--> statement-breakpoint
 CREATE POLICY scoped_select ON public.response_theme FOR SELECT TO authenticated
-  USING (private.can_read_engagement(org_id, engagement_id));--> statement-breakpoint
+  USING (org_id IN (SELECT private.user_org_ids()) AND engagement_id IN (SELECT private.readable_engagement_ids()));--> statement-breakpoint
 CREATE POLICY editor_write ON public.response_theme FOR ALL TO authenticated
   USING (private.can_edit_engagement(engagement_id))
   WITH CHECK (private.can_edit_engagement(engagement_id));--> statement-breakpoint

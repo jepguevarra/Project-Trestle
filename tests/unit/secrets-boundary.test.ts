@@ -55,7 +55,10 @@ describe("secrets boundary", () => {
     const ownerUsers = sources.filter(({ text }) => /\bdbOwner\b/.test(text)).map(({ path }) => path).sort();
     expect(ownerUsers).toEqual(["lib/db/index.ts", "lib/db/survey.ts"]);
 
+    // The seed submits its demo answers through the same role (lib/db/seed-responses.ts), on its own
+    // connection; nothing in the app may import it.
     const roleUsers = sources.filter(({ text }) => /withSurveyOn\b/.test(text)).map(({ path }) => path).sort();
-    expect(roleUsers).toEqual(["lib/db/survey-role.ts", "lib/db/survey.ts"]);
+    expect(roleUsers).toEqual(["lib/db/seed-responses.ts", "lib/db/survey-role.ts", "lib/db/survey.ts"]);
+    expect(sources.filter(({ path, text }) => path.startsWith("app/") && /seed-responses/.test(text))).toEqual([]);
   });
 });
