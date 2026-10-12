@@ -234,6 +234,43 @@ arrays, per `ARCHITECTURE.md`, so the numbers are unit-testable and auditable.
 
 Compute on read for v1. Cache only when a real dashboard feels slow.
 
+**As built (phase 05).** The rules above, made exact in `lib/scoring/`:
+
+- Agreement scales map 1 → 0 and the top point → 100. Choice questions place each option's score
+  between the question's lowest and highest option score; multiple choice averages the selected
+  options. Open text and numbers are not scored.
+- A dimension score is the mean, over submissions, of each submission's weighted mean on the
+  dimension's questions it answered; the spread is the sample standard deviation of those same
+  per-submission scores. Worked by hand in SQL in `tests/e2e/results.spec.ts`, which checks the
+  screen against it.
+- The perception gap needs five people on **each** side. Alpha uses submissions that answered every
+  scored question in the dimension (listwise), on the 0–100 scores; an item is flagged weak when its
+  corrected item-total correlation is under 0.30 or the dimension's alpha would rise without it.
+- Speeding is under 90 seconds from the first saved answer to submit (`response.duration_seconds`,
+  written by `private.submit_survey()`); straight-lining is the same raw answer to every agreement
+  question, five or more. Flags are advisory: nothing is excluded automatically.
+- **On an anonymous instrument nothing is shown until five people have submitted**, because the
+  respondent list says who has; with one submission the "mean" would be that person's answers. Open
+  answers are listed in random order without segment attributes.
+
+Not everything in phase 05 is derived. Three small tables hold what the consultant adds:
+
+```
+report_narrative        the consultant's words against a report
+  id, org_id, engagement_id, instrument_id, key (summary | findings | recommendations), body
+  unique (instrument_id, key)
+
+response_theme          a theme tagged by hand on an open-text answer
+  id, org_id, engagement_id, instrument_id, response_id, theme
+  unique (response_id, theme); FK (response_id, instrument_id) → response
+
+org_branding            the firm's logo for exports, kept off `organization` so org reads never carry image bytes
+  org_id (pk), logo bytea (≤ 512 KB, PNG or JPEG), logo_type
+```
+
+Narrative and themes are read with the engagement and written by its editors; the logo is read by
+every member and changed by admins.
+
 ### 4.1 OCM metrics, also derived
 
 Same rules: pure functions in `lib/scoring/`, unit-tested, nothing stored. Definitions are in
@@ -603,6 +640,13 @@ instead carry one policy per verb that includes both predicates, using helpers f
 `viewer` is denied writes in RLS as well as by the server action wrapper, because the Data API
 reaches the tables directly. RLS protects rows; the wrapper also protects verbs. Archived
 engagements are read-only to non-admins in RLS too.
+
+**Performance (phase 05).** `private.can_read_engagement(org_id, engagement_id)` is correlated, so
+Postgres calls it once per row and once per row of every join loop: joining 800 answers to their
+questions took 2.7 seconds. Read policies on the instrument and survey tables now use
+`org_id IN (SELECT private.user_org_ids()) AND engagement_id IN (SELECT private.readable_engagement_ids())`,
+uncorrelated subqueries that run once per statement and are probed as hashes (18 ms for the same
+join). Same rule; new engagement-scoped tables should use this form.
 
 ### The anonymous respondent path
 

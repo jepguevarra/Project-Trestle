@@ -31,17 +31,18 @@ resourcing or sprints. Every feature must be defensible as "a consultant would b
 
 ## Current state
 
-Phases 01 (foundations), 02 (clients and engagements), 02b (view kit), 03 (instrument engine) and 04 (distribution and response) are built. Each phase file ends with its
+Phases 01 (foundations), 02 (clients and engagements), 02b (view kit), 03 (instrument engine), 04 (distribution and response) and 05 (scoring and report) are built. Each phase file ends with its
 build notes and acceptance status. `docs/plan/` holds the build order: phases 01–20 plus 02b, run in
 the order given by the index in `docs/plan/README.md`, not by number. **Do not skip ahead.** Each
 phase depends on the schema and primitives of the ones before it.
 
-Next is `docs/plan/phase-05-scoring-report.md`. Build its screens from the view kit
-(`components/views/`, `lib/views/`); `phase-02b-view-kit.md`'s build notes say how a model plugs in.
-Responses carry `submission_id` for per-person checks on anonymous instruments; read only
-`response`, never `response_draft`. The readiness item wording in `docs/READINESS-INSTRUMENT.md` is a
+Next, by the order in `docs/plan/README.md`, is `docs/plan/phase-14-checklist-raci.md`. Build its
+screens from the view kit (`components/views/`, `lib/views/`); `phase-02b-view-kit.md`'s build notes
+say how a model plugs in. New engagement-scoped read policies use `private.readable_engagement_ids()`
+(DATA-MODEL.md §12, performance). The readiness item wording in `docs/READINESS-INSTRUMENT.md` is a
 draft awaiting review.
-Phase 05 is the first sellable point. Phases 01–05 are the capstone's minimum evaluation target.
+Phase 05, the first sellable point, is built: a readiness assessment runs end to end. Phases 01–05
+are the capstone's minimum evaluation target.
 
 Tenant queries run inside `withRls` (`lib/db`), which switches to Supabase's `authenticated` role
 with the user's claims so RLS applies. Drizzle's owner connection bypasses RLS. RLS tests run

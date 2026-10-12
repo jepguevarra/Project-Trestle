@@ -71,7 +71,7 @@ app/
   api/
     public/
       survey/[token]/route.ts  anonymous respondent read + submit (trestle_survey role)
-    exports/[kind]/route.ts    PDF / DOCX generation
+    exports/readiness/[instrumentId]/route.tsx   the readiness report PDF (phase 05)
     webhooks/
 components/
   ui/                          shadcn primitives, unmodified
@@ -134,10 +134,16 @@ All scoring lives in `lib/scoring/` as pure functions over plain arrays — no d
 This makes it unit-testable and makes the numbers auditable, which matters because a consultant
 will be asked "where did 62% come from?" in front of a client.
 
-- Readiness: normalise each answer to 0–100, weight by question weight, average within dimension,
-  weight dimensions to an overall index. Unanswered questions are excluded, not zeroed.
-- Segment breakdown returns `null` with a reason when `n < 5`, and the UI must render that reason
-  rather than a blank.
+- Readiness: normalise each answer to 0–100 (reverse-worded flipped), take each person's weighted
+  mean over the dimension's questions they answered, then the mean of those per dimension, with the
+  standard deviation of the same scores beside it; weight dimensions to an overall index.
+  Unanswered questions are excluded, not zeroed. (Phase 05, `lib/scoring/readiness.ts`.)
+- Every number that can be missing is a `Value`: a number, or `{ value: null, reason }`. Segments
+  return `{ suppressed, reason, n }` when the filter intersection is under 5, and the UI renders the
+  reason rather than a blank. On an anonymous instrument the whole report waits for 5 submissions.
+- `lib/db/queries/results.ts` loads `response` rows into those arrays; the Results screen and the
+  PDF (`lib/pdf/`, React-PDF, rendered in `app/api/exports/readiness/[instrumentId]` under the
+  user's session) both lay out the same `buildReport()` output.
 - Impact heatmap cell = max severity in the cell, with count carried alongside.
 
 ## Environments
